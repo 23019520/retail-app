@@ -1,0 +1,75 @@
+// functions/index.js
+const functions = require('firebase-functions');
+const admin = require('firebase-admin');
+admin.initializeApp();
+
+exports.onOrderStatusChange = functions.firestore
+  .document('orders/{orderId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+
+    // Only trigger when status actually changes
+    if (before.status === after.status) return null;
+
+    // Get the customer's FCM token
+    const userDoc = await admin.firestore()
+      .collection('users')
+      .doc(after.userId)
+      .get();
+
+    const token = userDoc.data()?.fcmToken;
+    if (!token) return null;
+
+    const statusMessages = {
+      confirmed:  'Your order has been confirmed! 🎉',
+      preparing:  'Your order is being prepared 👨‍🍳',
+      ready:      'Your order is ready! 📦',
+      completed:  'Your order has been delivered ✅',
+      cancelled:  'Your order has been cancelled',
+    };
+
+    const message = statusMessages[after.status];
+    if (!message) return null;
+
+    return admin.messaging().send({
+      token,
+      notification: {
+        title: 'Order Update',
+        body: message,
+      },
+      data: { orderId: context.params.orderId },
+    });
+  });
+
+// PayFast ITN (Instant Transaction Notification) handler
+// Called by PayFast when a payment completes
+exports.payfastNotify = functions.https.onRequest(async (req, res) => {
+  try {
+    const data = req.body;
+    const orderId = data.m_payment_id;
+    const paymentStatus = data.payment_status;
+
+    if (!orderId) {
+      res.status(400).send('Missing order ID');
+      return;
+    }
+
+    // Map PayFast status to our order status
+    const newStatus = paymentStatus === 'COMPLETE' ? 'confirmed' : 'cancelled';
+
+    await admin.firestore()
+      .collection('orders')
+      .doc(orderId)
+      .update({
+        status: newStatus,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        payfastPaymentId: data.pf_payment_id || null,
+      });
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('PayFast notify error:', error);
+    res.status(500).send('Error');
+  }
+});

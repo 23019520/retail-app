@@ -4,9 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/route_constants.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../../../core/utils/validators.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
-import '../widgets/login_form.dart';
 import '../widgets/social_login_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -18,12 +19,32 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _passwordFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _passwordFocus.dispose();
+    super.dispose();
+  }
+
+  // Single submit method — called by button AND keyboard done action
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    await ref.read(authNotifierProvider.notifier).signIn(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+    // Router handles navigation automatically on success
+  }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
 
-    // Show error as snackbar whenever errorMessage changes
     ref.listen(authNotifierProvider, (previous, next) {
       if (next.hasError && next.errorMessage != previous?.errorMessage) {
         context.showErrorSnackBar(next.errorMessage!);
@@ -56,16 +77,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 40),
 
-              // Form
-              LoginForm(
-                formKey: _formKey,
-                onSubmit: (email, password) async {
-                  await ref
-                      .read(authNotifierProvider.notifier)
-                      .signIn(email: email, password: password);
-                  // Router handles navigation on success via authStateProvider
-                  // Nothing to do here if success — router redirects automatically
-                },
+              // Form — controllers live here now, not in a sub-widget
+              Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    AppTextField(
+                      label: 'Email',
+                      hint: 'you@example.com',
+                      controller: _emailController,
+                      validator: Validators.email,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      prefixIcon: Icons.email_outlined,
+                      onFieldSubmitted: (_) =>
+                          _passwordFocus.requestFocus(),
+                    ),
+                    const SizedBox(height: 16),
+                    AppTextField(
+                      label: 'Password',
+                      hint: '••••••••',
+                      controller: _passwordController,
+                      validator: Validators.password,
+                      obscureText: true,
+                      textInputAction: TextInputAction.done,
+                      prefixIcon: Icons.lock_outline,
+                      focusNode: _passwordFocus,
+                      // Keyboard done button also submits
+                      onFieldSubmitted: (_) => _submit(),
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 12),
@@ -81,17 +123,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 24),
 
-              // Sign in button
+              // Sign in button — directly calls _submit()
               AppButton(
                 label: 'Sign In',
                 isLoading: authState.isLoading,
-                onPressed: () {
-                  if (_formKey.currentState?.validate() ?? false) {
-                    // Form validates itself — submit handled inside LoginForm
-                    // We trigger it here so the button drives the action
-                    _formKey.currentState?.validate();
-                  }
-                },
+                onPressed: _submit,
               ),
 
               const SizedBox(height: 24),
@@ -119,7 +155,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               SocialLoginButton(
                 isLoading: authState.isLoading,
                 onPressed: () {
-                  ref.read(authNotifierProvider.notifier).signInWithGoogle();
+                  ref
+                      .read(authNotifierProvider.notifier)
+                      .signInWithGoogle();
                 },
               ),
 
@@ -149,7 +187,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _showForgotPasswordDialog(BuildContext context) {
-    final emailController = TextEditingController();
+    final emailController =
+        TextEditingController(text: _emailController.text);
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -184,9 +224,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   .sendPasswordReset(emailController.text);
               if (!context.mounted) return;
               if (success) {
-                context.showSnackBar('Reset link sent — check your email.');
+                context.showSnackBar(
+                    'Reset link sent — check your email.');
               }
-              // Errors shown via the ref.listen at screen level
             },
             child: const Text('Send Link'),
           ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/user_model.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/notification_service.dart';
 
 // ── Service provider ─────────────────────────────────────────────────────────
 
@@ -40,7 +41,6 @@ final isAdminProvider = FutureProvider<bool>((ref) async {
 
 // ── Auth state for UI ─────────────────────────────────────────────────────────
 
-/// State held by AuthNotifier — what the UI reads.
 class AuthState {
   const AuthState({
     this.isLoading = false,
@@ -55,16 +55,13 @@ class AuthState {
   AuthState copyWith({bool? isLoading, String? errorMessage}) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage,           // null clears the error
+      errorMessage: errorMessage,
     );
   }
 }
 
 // ── Auth notifier ─────────────────────────────────────────────────────────────
 
-/// Handles sign-in, register, and sign-out actions.
-/// UI watches [authNotifierProvider] for loading/error state,
-/// and watches [authStateProvider] for the actual auth change.
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._authService) : super(const AuthState());
 
@@ -72,9 +69,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<bool> signIn({required String email, required String password}) async {
     state = state.copyWith(isLoading: true);
-    final result = await _authService.signInWithEmail(email: email, password: password);
+    final result = await _authService.signInWithEmail(
+        email: email, password: password);
     if (result.isSuccess) {
-      state = const AuthState(); // clear loading + error
+      // Init notifications and save FCM token after successful sign-in
+      final uid = result.user?.uid;
+      if (uid != null) {
+        final ns = NotificationService();
+        await ns.init();
+        await ns.saveToken(uid);
+      }
+      state = const AuthState();
       return true;
     }
     state = AuthState(errorMessage: result.errorMessage);
@@ -93,6 +98,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       password: password,
     );
     if (result.isSuccess) {
+      // Save FCM token for new registrations too
+      final uid = result.user?.uid;
+      if (uid != null) {
+        final ns = NotificationService();
+        await ns.init();
+        await ns.saveToken(uid);
+      }
       state = const AuthState();
       return true;
     }
@@ -104,6 +116,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true);
     final result = await _authService.signInWithGoogle();
     if (result.isSuccess) {
+      final uid = result.user?.uid;
+      if (uid != null) {
+        final ns = NotificationService();
+        await ns.init();
+        await ns.saveToken(uid);
+      }
       state = const AuthState();
       return true;
     }
