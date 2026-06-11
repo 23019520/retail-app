@@ -76,7 +76,7 @@ class _ProfileContent extends ConsumerWidget {
                 children: [
 
                   // ── Account ──────────────────────────────────────
-                  _SectionLabel('Account'),
+                  const _SectionLabel('Account'),
                   _MenuCard(children: [
                     _MenuItem(
                       icon: Icons.person_outline_rounded,
@@ -94,7 +94,7 @@ class _ProfileContent extends ConsumerWidget {
                   const SizedBox(height: 20),
 
                   // ── Shopping ─────────────────────────────────────
-                  _SectionLabel('Shopping'),
+                  const _SectionLabel('Shopping'),
                   _MenuCard(children: [
                     _MenuItem(
                       icon: Icons.receipt_long_outlined,
@@ -110,7 +110,7 @@ class _ProfileContent extends ConsumerWidget {
 
                   // ── Admin shortcut ────────────────────────────────
                   if (user.isAdmin) ...[
-                    _SectionLabel('Administration'),
+                    const _SectionLabel('Administration'),
                     _MenuCard(children: [
                       _MenuItem(
                         icon: Icons.admin_panel_settings_outlined,
@@ -124,7 +124,7 @@ class _ProfileContent extends ConsumerWidget {
                   ],
 
                   // ── Support ───────────────────────────────────────
-                  _SectionLabel('Support'),
+                  const _SectionLabel('Support'),
                   _MenuCard(children: [
                     _MenuItem(
                       icon: Icons.help_outline_rounded,

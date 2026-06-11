@@ -1,157 +1,101 @@
 import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 
+/// Result returned by PaymentService.
 class PaymentResult {
   const PaymentResult._({
     required this.success,
-    this.paymentId,
+    this.checkoutUrl,
     this.errorMessage,
   });
 
-  factory PaymentResult.success(String paymentId) =>
-      PaymentResult._(success: true, paymentId: paymentId);
+  factory PaymentResult.success(String checkoutUrl) =>
+      PaymentResult._(success: true, checkoutUrl: checkoutUrl);
 
   factory PaymentResult.failure(String message) =>
       PaymentResult._(success: false, errorMessage: message);
 
   final bool success;
-  final String? paymentId;
+
+  /// The Yoco hosted checkout URL — open this in YocoPaymentScreen.
+  final String? checkoutUrl;
   final String? errorMessage;
 }
 
 class PaymentService {
-  // ── PayFast ────────────────────────────────────────────────────────────────
-
-  Future<PaymentResult> initiatePayFast({
-    required String orderId,
-    required double amount,
-    required String customerName,
-    required String customerEmail,
-    required String itemName,
-  }) async {
-    final merchantId   = dotenv.env['PAYFAST_MERCHANT_ID'] ?? '';
-    final merchantKey  = dotenv.env['PAYFAST_MERCHANT_KEY'] ?? '';
-    final passphrase   = dotenv.env['PAYFAST_PASSPHRASE'] ?? '';
-    final isSandbox    = dotenv.env['PAYFAST_SANDBOX'] == 'true';
-    final projectId    = dotenv.env['FIREBASE_PROJECT_ID'] ?? '';
-
-    if (merchantId.isEmpty || merchantKey.isEmpty) {
-      return PaymentResult.failure(
-          'PayFast credentials not configured in .env');
-    }
-
-    final amountStr = amount.toStringAsFixed(2);
-    final nameParts = customerName.trim().split(' ');
-    final firstName = nameParts.first;
-    final lastName  = nameParts.length > 1 ? nameParts.last : '';
-
-    // For sandbox: use a simple success page as return URL
-    // For production: use your deep link retailapp://payment/success
-    final returnUrl = isSandbox
-        ? 'https://$projectId.web.app/payment-success.html'
-        : 'retailapp://payment/success?orderId=$orderId';
-    final cancelUrl = isSandbox
-        ? 'https://$projectId.web.app/payment-cancel.html'
-        : 'retailapp://payment/cancel?orderId=$orderId';
-    final notifyUrl = projectId.isNotEmpty
-        ? 'https://us-central1-$projectId.cloudfunctions.net/payfastNotify'
-        : 'https://webhook.site/test'; // fallback for testing
-
-    final params = <String, String>{
-      'merchant_id':   merchantId,
-      'merchant_key':  merchantKey,
-      'return_url':    returnUrl,
-      'cancel_url':    cancelUrl,
-      'notify_url':    notifyUrl,
-      'name_first':    firstName,
-      'name_last':     lastName,
-      'email_address': customerEmail,
-      'm_payment_id':  orderId,
-      'amount':        amountStr,
-      'item_name':     itemName,
-    };
-
-    // Generate signature
-    final signature = _generateSignature(params, passphrase);
-    params['signature'] = signature;
-
-    final queryString = params.entries
-        .map((e) =>
-            '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
-        .join('&');
-
-    final baseUrl = isSandbox
-        ? 'https://sandbox.payfast.co.za/eng/process'
-        : 'https://www.payfast.co.za/eng/process';
-
-    final uri = Uri.parse('$baseUrl?$queryString');
-
-    debugPrint('PayFast URL: $uri');
-
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        return PaymentResult.success(orderId);
-      } else {
-        return PaymentResult.failure('Could not open PayFast. Please check your internet connection.');
-      }
-    } catch (e) {
-      return PaymentResult.failure('Payment error: $e');
-    }
-  }
-
   // ── Yoco ───────────────────────────────────────────────────────────────────
 
-  Future<PaymentResult> initiateYoco({
+  /// Creates a Yoco checkout session and returns the checkout URL.
+  /// Open the URL in YocoPaymentScreen — do NOT use url_launcher.
+  Future<PaymentResult> createYocoCheckout({
     required String orderId,
     required double amount,
+    required String customerEmail,
   }) async {
-    final publicKey = dotenv.env['YOCO_PUBLIC_KEY'] ?? '';
+    final secretKey = dotenv.env['YOCO_SECRET_KEY'] ?? '';
+    final projectId = dotenv.env['FIREBASE_PROJECT_ID'] ?? '';
 
-    if (publicKey.isEmpty) {
-      return PaymentResult.failure('Yoco not configured. Add YOCO_PUBLIC_KEY to .env');
+    if (secretKey.isEmpty) {
+      return PaymentResult.failure(
+          'Yoco not configured. Add YOCO_SECRET_KEY to .env');
     }
 
-    final uri = Uri.parse(
-        'https://checkout.yoco.com/?amount=${(amount * 100).round()}'
-        '&currency=ZAR'
-        '&publicKey=$publicKey'
-        '&metadata={"orderId":"$orderId"}');
+    // Yoco requires amount in cents
+    final amountInCents = (amount * 100).round();
+
+    // These are the URLs Yoco redirects to after payment.
+    // YocoPaymentScreen detects these redirects and pops with true/false.
+    final successUrl = 'https://$projectId.web.app/payment-success.html';
+    final cancelUrl  = 'https://$projectId.web.app/payment-cancel.html';
 
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        return PaymentResult.success(orderId);
+      final response = await http.post(
+        Uri.parse('https://payments.yoco.com/api/checkouts'),
+        headers: {
+          'Authorization': 'Bearer $secretKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'amount':     amountInCents,
+          'currency':   'ZAR',
+          'successUrl': successUrl,
+          'cancelUrl':  cancelUrl,
+          'metadata':   {
+            'orderId':        orderId,
+            'customerEmail':  customerEmail,
+          },
+        }),
+      );
+
+      debugPrint('Yoco response: ${response.statusCode} ${response.body}');
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        return PaymentResult.failure(
+            'Could not create Yoco payment. Please try again.');
       }
-      return PaymentResult.failure('Could not open Yoco checkout.');
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final redirectUrl = data['redirectUrl'] as String?;
+
+      if (redirectUrl == null || redirectUrl.isEmpty) {
+        return PaymentResult.failure(
+            'Yoco did not return a checkout URL.');
+      }
+
+      return PaymentResult.success(redirectUrl);
     } catch (e) {
-      return PaymentResult.failure('Yoco error: $e');
+      debugPrint('Yoco error: $e');
+      return PaymentResult.failure(
+          'Could not reach Yoco. Check your internet connection.');
     }
   }
 
-  // ── Cash ───────────────────────────────────────────────────────────────────
+  // ── Cash on Delivery ───────────────────────────────────────────────────────
 
-  Future<PaymentResult> confirmCashOnDelivery(String orderId) async {
-    return PaymentResult.success(orderId);
-  }
-
-  // ── Signature ──────────────────────────────────────────────────────────────
-
-  String _generateSignature(Map<String, String> params, String passphrase) {
-    // Build the string in the order PayFast expects
-    final paramString = params.entries
-        .where((e) => e.key != 'signature')
-        .map((e) =>
-            '${e.key}=${Uri.encodeComponent(e.value).replaceAll('+', '%20')}')
-        .join('&');
-
-    final withPassphrase = passphrase.isNotEmpty
-        ? '$paramString&passphrase=${Uri.encodeComponent(passphrase).replaceAll('+', '%20')}'
-        : paramString;
-
-    return md5.convert(utf8.encode(withPassphrase)).toString();
+  /// No gateway needed — just confirm immediately.
+  Future<PaymentResult> confirmCash() async {
+    return PaymentResult.success('cash');
   }
 }

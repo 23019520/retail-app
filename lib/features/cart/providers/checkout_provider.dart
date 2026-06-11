@@ -9,8 +9,6 @@ import 'cart_provider.dart';
 
 final orderServiceProvider = Provider<OrderService>((ref) => OrderService());
 
-// ── Checkout form state ────────────────────────────────────────────────────
-
 class CheckoutState {
   const CheckoutState({
     this.deliveryMethod = DeliveryMethod.delivery,
@@ -33,9 +31,7 @@ class CheckoutState {
   final String? errorMessage;
 
   bool get hasError => errorMessage != null;
-
   bool get addressRequired => deliveryMethod == DeliveryMethod.delivery;
-
   bool get addressComplete =>
       !addressRequired ||
       (street.trim().isNotEmpty &&
@@ -46,8 +42,7 @@ class CheckoutState {
 
   double get deliveryFee {
     if (deliveryMethod == DeliveryMethod.pickup) return 0;
-    return double.tryParse(
-            dotenv.env['DELIVERY_FEE'] ?? '') ??
+    return double.tryParse(dotenv.env['DELIVERY_FEE'] ?? '') ??
         AppConstants.defaultDeliveryFee;
   }
 
@@ -81,31 +76,34 @@ class CheckoutNotifier extends StateNotifier<CheckoutState> {
 
   void setDeliveryMethod(DeliveryMethod method) =>
       state = state.copyWith(deliveryMethod: method);
-
   void setPaymentMethod(PaymentMethod method) =>
       state = state.copyWith(paymentMethod: method);
-
   void setStreet(String v) => state = state.copyWith(street: v);
   void setCity(String v) => state = state.copyWith(city: v);
   void setPostalCode(String v) => state = state.copyWith(postalCode: v);
   void setNotes(String v) => state = state.copyWith(notes: v);
   void clearError() => state = state.copyWith(errorMessage: null);
 
-  /// Validates, creates the order, clears the cart, returns order ID or null.
-  Future<String?> submitOrder() async {
+  /// Validates form — call before launching payment gateway.
+  bool validate() {
     if (!state.addressComplete) {
       state = state.copyWith(
           errorMessage: 'Please fill in your delivery address.');
-      return null;
+      return false;
     }
+    return true;
+  }
 
+  /// Creates the order in Firestore AFTER payment is confirmed.
+  Future<String?> createOrder() async {
     state = state.copyWith(isLoading: true);
 
     try {
       final user = _ref.read(currentFirebaseUserProvider);
       if (user == null) {
         state = state.copyWith(
-            isLoading: false, errorMessage: 'You must be signed in.');
+            isLoading: false,
+            errorMessage: 'You must be signed in.');
         return null;
       }
 
@@ -116,21 +114,24 @@ class CheckoutNotifier extends StateNotifier<CheckoutState> {
         return null;
       }
 
-      final orderId = await _ref.read(orderServiceProvider).createOrder(
-            userId: user.uid,
-            cart: cart,
-            deliveryMethod: state.deliveryMethod,
-            paymentMethod: state.paymentMethod,
-            deliveryFee: state.deliveryFee,
-            deliveryAddress:
-                state.addressRequired ? state.fullAddress : null,
-            notes: state.notes.trim().isNotEmpty ? state.notes.trim() : null,
-          );
+      final orderId =
+          await _ref.read(orderServiceProvider).createOrder(
+                userId: user.uid,
+                cart: cart,
+                deliveryMethod: state.deliveryMethod,
+                paymentMethod: state.paymentMethod,
+                deliveryFee: state.deliveryFee,
+                deliveryAddress:
+                    state.addressRequired ? state.fullAddress : null,
+                notes: state.notes.trim().isNotEmpty
+                    ? state.notes.trim()
+                    : null,
+              );
 
-      // Clear the cart after successful order
+      // Clear cart after order created
       await _ref.read(cartNotifierProvider.notifier).clearCart();
 
-      state = const CheckoutState(); // reset form
+      state = const CheckoutState();
       return orderId;
     } catch (e) {
       state = state.copyWith(

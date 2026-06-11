@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,35 +7,61 @@ import '../../../core/constants/route_constants.dart';
 import '../../../core/models/order_model.dart';
 import '../../../core/services/payment_service.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_loading.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/checkout_provider.dart';
 import '../widgets/address_form.dart';
 import '../widgets/cart_summary.dart';
 import '../widgets/payment_method_selector.dart';
+import 'yoco_payment_screen.dart';
 
 final _paymentServiceProvider =
     Provider<PaymentService>((ref) => PaymentService());
 
-class CheckoutScreen extends ConsumerWidget {
+class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CheckoutScreen> createState() => _CheckoutScreenState();
+}
+
+class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
+  bool _processingPayment = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen to checkoutProvider once during the widget lifecycle to show error SnackBars.
+    ref.listen(checkoutProvider, (previous, next) {
+      if (next.hasError && next.errorMessage != previous?.errorMessage) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final colors = Theme.of(context).colorScheme;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(next.errorMessage!),
+            backgroundColor: colors.error,
+            behavior: SnackBarBehavior.floating,
+          ));
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final checkoutState = ref.watch(checkoutProvider);
     final cart = ref.watch(cartProvider).value;
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
 
-    ref.listen(checkoutProvider, (previous, next) {
-      if (next.hasError && next.errorMessage != previous?.errorMessage) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(next.errorMessage!),
-          backgroundColor: colors.error,
-          behavior: SnackBarBehavior.floating,
-        ));
-      }
-    });
+    // Checkout provider listener moved to initState to avoid re-registration
+
+    if (_processingPayment) {
+      return const Scaffold(
+        body: AppLoading(message: 'Processing payment...'),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -49,20 +76,20 @@ class CheckoutScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            // ── Delivery method ────────────────────────────────────
+            // ── Delivery method ──────────────────────────────────
             Text('Delivery Method',
                 style: text.titleMedium
                     ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             _DeliveryMethodToggle(
               selected: checkoutState.deliveryMethod,
-              onChanged:
-                  ref.read(checkoutProvider.notifier).setDeliveryMethod,
+              onChanged: ref
+                  .read(checkoutProvider.notifier)
+                  .setDeliveryMethod,
               colors: colors,
             ),
 
-            // ── Address (delivery only) ────────────────────────────
+            // ── Address ──────────────────────────────────────────
             if (checkoutState.deliveryMethod ==
                 DeliveryMethod.delivery) ...[
               const SizedBox(height: 28),
@@ -71,12 +98,12 @@ class CheckoutScreen extends ConsumerWidget {
 
             const SizedBox(height: 28),
 
-            // ── Payment method ─────────────────────────────────────
+            // ── Payment method ───────────────────────────────────
             const PaymentMethodSelector(),
 
             const SizedBox(height: 28),
 
-            // ── Notes ──────────────────────────────────────────────
+            // ── Notes ────────────────────────────────────────────
             Text('Order Notes (optional)',
                 style: text.titleMedium
                     ?.copyWith(fontWeight: FontWeight.bold)),
@@ -92,7 +119,7 @@ class CheckoutScreen extends ConsumerWidget {
 
             const SizedBox(height: 28),
 
-            // ── Order summary ──────────────────────────────────────
+            // ── Order summary ─────────────────────────────────────
             if (cart != null)
               CartSummary(
                 subtotal: cart.subtotal,
@@ -103,14 +130,17 @@ class CheckoutScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // ── Place order ────────────────────────────────────────
+            // ── Place order / Pay button ──────────────────────────
             AppButton(
-              label: _buttonLabel(checkoutState.paymentMethod),
+              label: checkoutState.paymentMethod == PaymentMethod.yoco
+                  ? 'Pay with Yoco'
+                  : 'Place Order',
+              icon: checkoutState.paymentMethod == PaymentMethod.yoco
+                  ? Icons.lock_outline_rounded
+                  : Icons.check_rounded,
               isLoading: checkoutState.isLoading,
               isDisabled: cart == null || cart.isEmpty,
-              icon: _buttonIcon(checkoutState.paymentMethod),
-              onPressed: () =>
-                  _handlePlaceOrder(context, ref, checkoutState),
+              onPressed: () => _handlePlaceOrder(context, ref),
             ),
 
             SizedBox(
@@ -122,80 +152,116 @@ class CheckoutScreen extends ConsumerWidget {
     );
   }
 
-  String _buttonLabel(PaymentMethod method) {
-    switch (method) {
-      case PaymentMethod.payfast:
-        return 'Pay with PayFast';
-      case PaymentMethod.yoco:
-        return 'Pay with Yoco';
-      case PaymentMethod.cash:
-        return 'Place Order';
-    }
-  }
-
-  IconData _buttonIcon(PaymentMethod method) {
-    switch (method) {
-      case PaymentMethod.payfast:
-      case PaymentMethod.yoco:
-        return Icons.lock_outline_rounded;
-      case PaymentMethod.cash:
-        return Icons.check_rounded;
-    }
-  }
-
   Future<void> _handlePlaceOrder(
-    BuildContext context,
-    WidgetRef ref,
-    CheckoutState checkoutState,
-  ) async {
-    // Step 1: Create the order in Firestore
-    final orderId =
-        await ref.read(checkoutProvider.notifier).submitOrder();
-    if (orderId == null || !context.mounted) return;
+      BuildContext context, WidgetRef ref) async {
+    // Step 1 — Validate address form
+    final isValid =
+        ref.read(checkoutProvider.notifier).validate();
+    if (!isValid) return;
 
-    // Step 2: Handle payment gateway
-    final paymentMethod = checkoutState.paymentMethod;
+    final checkoutState = ref.read(checkoutProvider);
     final cart = ref.read(cartProvider).value;
-    final user = ref.read(currentFirebaseUserProvider);
-    final userModel = await ref.read(currentUserProvider.future);
+    if (cart == null || cart.isEmpty) return;
 
-    if (paymentMethod != PaymentMethod.cash && cart != null) {
-      final paymentService = ref.read(_paymentServiceProvider);
+    // ── Yoco payment flow ─────────────────────────────────────────
+    if (checkoutState.paymentMethod == PaymentMethod.yoco) {
+      final userModel = await ref.read(currentUserProvider.future);
+      final totalAmount = cart.subtotal + checkoutState.deliveryFee;
+      final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+      final projectId = dotenv.env['FIREBASE_PROJECT_ID'] ?? '';
 
-      PaymentResult result;
-      if (paymentMethod == PaymentMethod.payfast) {
-        result = await paymentService.initiatePayFast(
-          orderId: orderId,
-          amount: cart.subtotal + checkoutState.deliveryFee,
-          customerName: userModel?.name ?? 'Customer',
-          customerEmail:
-              userModel?.email ?? user?.email ?? '',
-          itemName:
-              '${cart.itemCount} item${cart.itemCount == 1 ? '' : 's'} from My Store',
-        );
-      } else {
-        result = await paymentService.initiateYoco(
-          orderId: orderId,
-          amount: cart.subtotal + checkoutState.deliveryFee,
-        );
+      // Validate required env var
+      if (projectId.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: const Text(
+                'Missing FIREBASE_PROJECT_ID environment variable. Payment cannot proceed.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ));
+        }
+        return;
       }
 
-      if (!result.success && context.mounted) {
+      // Step 2 — Create Yoco checkout session
+      setState(() => _processingPayment = true);
+
+      final result = await ref
+          .read(_paymentServiceProvider)
+          .createYocoCheckout(
+            orderId: tempId,
+            amount: totalAmount,
+            customerEmail: userModel?.email ?? '',
+          );
+
+      setState(() => _processingPayment = false);
+
+      if (!result.success || result.checkoutUrl == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                result.errorMessage ?? 'Could not start payment.'),
+            backgroundColor:
+                Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ));
+        }
+        return;
+      }
+
+      // Step 3 — Open Yoco checkout in WebView
+      if (!context.mounted) return;
+      final paid = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => YocoPaymentScreen(
+            checkoutUrl: result.checkoutUrl!,
+            successUrl:
+                'https://$projectId.web.app/payment-success.html',
+            cancelUrl:
+                'https://$projectId.web.app/payment-cancel.html',
+          ),
+        ),
+      );
+
+      // Step 4 — User cancelled or closed WebView
+      if (paid != true) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Payment was not completed.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // ── Step 5 — Payment confirmed (Yoco) or Cash selected ────────
+    // Only now do we create the order in Firestore
+    if (!context.mounted) return;
+    String? orderId;
+    try {
+      orderId = await ref.read(checkoutProvider.notifier).createOrder();
+      if (orderId == null) {
+        throw Exception('Order creation returned null');
+      }
+    } catch (e) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content:
-              Text(result.errorMessage ?? 'Payment failed.'),
-          backgroundColor:
-              Theme.of(context).colorScheme.error,
+          content: Text('Could not create order: ${e.toString()}'),
+          backgroundColor: Theme.of(context).colorScheme.error,
           behavior: SnackBarBehavior.floating,
         ));
-        // Order is created but unpaid — admin can see it as 'pending'
-        // and handle manually. Navigate to success regardless.
       }
+      // Consider idempotency/reconciliation here: record payment/temp id to retry or reconcile on backend.
+      return;
     }
 
-    // Step 3: Navigate to success screen
-    if (context.mounted) {
-      context.go('${RouteConstants.orderSuccess}?orderId=$orderId');
+    if (context.mounted && orderId != null) {
+      context
+          .go('${RouteConstants.orderSuccess}?orderId=$orderId');
     }
   }
 }
@@ -227,7 +293,9 @@ class _DeliveryMethodToggle extends StatelessWidget {
               margin: EdgeInsets.only(right: isFirst ? 8 : 0),
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                color: isSelected ? colors.primary : colors.surface,
+                color: isSelected
+                    ? colors.primary
+                    : colors.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: isSelected

@@ -96,7 +96,7 @@ class ProductCard extends StatelessWidget {
                           color: colors.error,
                         )
                       else if (product.lowStock)
-                        _StockBadge(
+                        const _StockBadge(
                           label: 'Low stock',
                           color: Colors.orange,
                         ),

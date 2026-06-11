@@ -98,7 +98,7 @@ class _AdminOrderDetail extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _Label('Current Status'),
+                        const _Label('Current Status'),
                         const SizedBox(height: 6),
                         OrderStatusBadge(
                             status: order.status, large: true),
@@ -108,7 +108,7 @@ class _AdminOrderDetail extends ConsumerWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      _Label('Placed'),
+                      const _Label('Placed'),
                       const SizedBox(height: 6),
                       Text(
                         order.createdAt != null
@@ -131,7 +131,7 @@ class _AdminOrderDetail extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _CardTitle('Customer'),
+                  const _CardTitle('Customer'),
                   const SizedBox(height: 12),
                   _InfoRow(
                       icon: Icons.person_outline_rounded,
@@ -215,7 +215,7 @@ class _AdminOrderDetail extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _CardTitle('Payment'),
+                  const _CardTitle('Payment'),
                   const SizedBox(height: 12),
                   _InfoRow(
                     icon: Icons.credit_card_outlined,
@@ -261,7 +261,7 @@ class _AdminOrderDetail extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _CardTitle('Update Status'),
+                    const _CardTitle('Update Status'),
                     const SizedBox(height: 12),
                     _StatusActionButton(
                       order: order,

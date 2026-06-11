@@ -34,14 +34,13 @@ extension DeliveryMethodX on DeliveryMethod {
   String get label => this == DeliveryMethod.delivery ? 'Delivery' : 'Pickup';
 }
 
-enum PaymentMethod { payfast, yoco, cash }
+enum PaymentMethod { yoco, cash }
 
 extension PaymentMethodX on PaymentMethod {
   String get label {
     switch (this) {
-      case PaymentMethod.payfast: return 'PayFast';
-      case PaymentMethod.yoco:    return 'Yoco';
-      case PaymentMethod.cash:    return 'Cash on Delivery';
+      case PaymentMethod.yoco: return 'Yoco';
+      case PaymentMethod.cash: return 'Cash on Delivery';
     }
   }
 }

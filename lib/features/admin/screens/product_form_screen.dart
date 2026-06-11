@@ -133,7 +133,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── Images ────────────────────────────────────────────
-              _SectionTitle('Product Images'),
+              const _SectionTitle('Product Images'),
               const SizedBox(height: 12),
               _ImageGrid(
                 existingUrls: formState.existingImageUrls,
@@ -149,7 +149,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               const SizedBox(height: 24),
 
               // ── Details ───────────────────────────────────────────
-              _SectionTitle('Product Details'),
+              const _SectionTitle('Product Details'),
               const SizedBox(height: 12),
               AppTextField(
                 label: 'Product Name',
@@ -222,7 +222,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                 error: (_, __) => const SizedBox.shrink(),
                 data: (categories) =>
                     DropdownButtonFormField<String>(
-                  value: formState.categoryId.isNotEmpty
+                  initialValue: formState.categoryId.isNotEmpty
                       ? formState.categoryId
                       : null,
                   decoration: const InputDecoration(
@@ -334,14 +334,14 @@ class _ImageGrid extends StatelessWidget {
       runSpacing: 10,
       children: [
         ...existingUrls.map((url) => _ImageThumb(
-              child: Image.network(url, fit: BoxFit.cover),
               onRemove: () => onRemoveExisting(url),
               colors: colors,
+              child: Image.network(url, fit: BoxFit.cover),
             )),
         ...newFiles.map((file) => _ImageThumb(
-              child: Image.file(file, fit: BoxFit.cover),
               onRemove: () => onRemoveNew(file),
               colors: colors,
+              child: Image.file(file, fit: BoxFit.cover),
             )),
         GestureDetector(
           onTap: onAdd,

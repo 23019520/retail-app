@@ -122,7 +122,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(height: 24),
 
                     // ── Logo ───────────────────────────────────────
-                    _SectionTitle('Business Logo'),
+                    const _SectionTitle('Business Logo'),
                     const SizedBox(height: 12),
                     _LogoPicker(
                       existingUrl: business.logoUrl,
@@ -134,7 +134,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(height: 24),
 
                     // ── Business info ──────────────────────────────
-                    _SectionTitle('Business Information'),
+                    const _SectionTitle('Business Information'),
                     const SizedBox(height: 12),
                     AppTextField(
                       label: 'Business Name',
@@ -177,7 +177,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(height: 28),
 
                     // ── Branding colours preview ───────────────────
-                    _SectionTitle('Brand Colors'),
+                    const _SectionTitle('Brand Colors'),
                     const SizedBox(height: 12),
                     _ColorPreview(
                       primaryColor: colors.primary,

@@ -17,7 +17,8 @@ class PaymentMethodSelector extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Payment Method',
-            style: text.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            style:
+                text.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         ...PaymentMethod.values.map((method) => _PaymentOption(
               method: method,
@@ -42,9 +43,8 @@ class _PaymentOption extends StatelessWidget {
 
   IconData get _icon {
     switch (method) {
-      case PaymentMethod.payfast: return Icons.credit_card_rounded;
-      case PaymentMethod.yoco:    return Icons.contactless_rounded;
-      case PaymentMethod.cash:    return Icons.payments_outlined;
+      case PaymentMethod.yoco: return Icons.contactless_rounded;
+      case PaymentMethod.cash: return Icons.payments_outlined;
     }
   }
 
@@ -57,14 +57,17 @@ class _PaymentOption extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: isSelected
               ? colors.primaryContainer.withValues(alpha: 0.5)
               : colors.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? colors.primary : colors.outline.withValues(alpha: 0.2),
+            color: isSelected
+                ? colors.primary
+                : colors.outline.withValues(alpha: 0.2),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -81,17 +84,21 @@ class _PaymentOption extends StatelessWidget {
               ),
               child: Icon(
                 _icon,
-                color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
+                color: isSelected
+                    ? colors.onPrimary
+                    : colors.onSurfaceVariant,
                 size: 20,
               ),
             ),
             const SizedBox(width: 14),
             Text(
               method.label,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight:
-                        isSelected ? FontWeight.w600 : FontWeight.w400,
-                  ),
+              style:
+                  Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
             ),
             const Spacer(),
             if (isSelected)
