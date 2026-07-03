@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/order_model.dart';
-import '../../../core/widgets/app_empty_state.dart';
-import '../../../core/widgets/app_error_widget.dart';
-import '../../../core/widgets/app_loading.dart';
+import '../../../core/widgets/app_shimmer.dart';
+import '../../../core/widgets/app_states.dart';
+import '../../../core/widgets/app_stagger.dart';
+import '../../../theme/app_theme.dart';
 import '../providers/admin_orders_provider.dart';
 import '../widgets/admin_order_tile.dart';
 
@@ -16,20 +17,19 @@ class OrderManagementScreen extends ConsumerStatefulWidget {
       _OrderManagementScreenState();
 }
 
-class _OrderManagementScreenState
-    extends ConsumerState<OrderManagementScreen>
+class _OrderManagementScreenState extends ConsumerState<OrderManagementScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
   static const _tabs = [
-    (label: 'All', statuses: <OrderStatus>[]),
+    (label: 'All',     statuses: <OrderStatus>[]),
     (label: 'Pending', statuses: [OrderStatus.pending]),
-    (label: 'Active', statuses: [
+    (label: 'Active',  statuses: [
       OrderStatus.confirmed,
       OrderStatus.preparing,
-      OrderStatus.ready
+      OrderStatus.ready,
     ]),
-    (label: 'Done', statuses: [OrderStatus.completed]),
+    (label: 'Done',    statuses: [OrderStatus.completed]),
   ];
 
   @override
@@ -46,55 +46,70 @@ class _OrderManagementScreenState
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
     return Scaffold(
+      backgroundColor: AppColors.backgroundBase,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            // ── Header ───────────────────────────────────────────────────
+            const Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.base,
+                AppSpacing.base,
+                AppSpacing.base,
+                0,
+              ),
               child: Text(
                 'Orders',
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.5,
+                ),
               ),
             ),
-            const SizedBox(height: 16),
 
-            // Tab bar
+            const SizedBox(height: AppSpacing.base),
+
+            // ── Tab bar ──────────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.base),
               child: Container(
-                height: 44,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: colors.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.backgroundCard,
+                  borderRadius: BorderRadius.circular(AppRadius.button),
+                  border: Border.all(color: AppColors.divider, width: 0.5),
                 ),
                 child: TabBar(
                   controller: _tabController,
-                  labelColor: colors.onPrimary,
-                  unselectedLabelColor:
-                      colors.onSurface.withValues(alpha: 0.6),
+                  labelColor: const Color(0xFF0E2419),
+                  unselectedLabelColor: AppColors.textMuted,
                   indicator: BoxDecoration(
-                    color: colors.primary,
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(AppRadius.chip + 2),
                   ),
                   indicatorSize: TabBarIndicatorSize.tab,
                   dividerColor: Colors.transparent,
                   labelStyle: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600),
-                  tabs: _tabs
-                      .map((t) => Tab(text: t.label))
-                      .toList(),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  padding: const EdgeInsets.all(3),
+                  tabs: _tabs.map((t) => Tab(text: t.label)).toList(),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
 
+            const SizedBox(height: AppSpacing.md),
+
+            // ── Tab views ─────────────────────────────────────────────────
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -106,24 +121,32 @@ class _OrderManagementScreenState
                     loading: () => const AppLoading(),
                     error: (_, __) => AppErrorWidget(
                       message: 'Could not load orders.',
-                      onRetry: () =>
-                          ref.invalidate(allOrdersProvider),
+                      onRetry: () => ref.invalidate(allOrdersProvider),
                     ),
                     data: (orders) {
                       if (orders.isEmpty) {
                         return const AppEmptyState(
                           icon: Icons.receipt_long_outlined,
                           title: 'No orders here',
+                          subtitle: 'Orders will appear here as they come in.',
                         );
                       }
-                      return ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(
-                            20, 4, 20, 32),
-                        itemCount: orders.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 10),
-                        itemBuilder: (context, index) =>
-                            AdminOrderTile(order: orders[index]),
+                      return AppStagger(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.base,
+                            AppSpacing.xs,
+                            AppSpacing.base,
+                            AppSpacing.xl,
+                          ),
+                          itemCount: orders.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: AppSpacing.sm),
+                          itemBuilder: (context, index) => AppStaggerItem(
+                            index: index,
+                            child: AdminOrderTile(order: orders[index]),
+                          ),
+                        ),
                       );
                     },
                   );

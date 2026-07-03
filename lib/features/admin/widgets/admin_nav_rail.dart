@@ -25,6 +25,12 @@ class AdminShellScaffold extends StatelessWidget {
       route: RouteConstants.adminProducts,
     ),
     _NavItem(
+      icon: Icons.category_outlined,
+      activeIcon: Icons.category_rounded,
+      label: 'Categories',
+      route: RouteConstants.adminCategories,
+    ),
+    _NavItem(
       icon: Icons.receipt_long_outlined,
       activeIcon: Icons.receipt_long_rounded,
       label: 'Orders',
@@ -41,8 +47,9 @@ class AdminShellScaffold extends StatelessWidget {
   int _selectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
     if (location.startsWith(RouteConstants.adminProducts)) return 1;
-    if (location.startsWith(RouteConstants.adminOrders)) return 2;
-    if (location == RouteConstants.adminSettings) return 3;
+    if (location.startsWith(RouteConstants.adminCategories)) return 2;
+    if (location.startsWith(RouteConstants.adminOrders)) return 3;
+    if (location == RouteConstants.adminSettings) return 4;
     return 0;
   }
 

@@ -31,14 +31,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  // Single submit method — called by button AND keyboard done action
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     await ref.read(authNotifierProvider.notifier).signIn(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
-    // Router handles navigation automatically on success
   }
 
   @override
@@ -60,7 +58,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             children: [
               const SizedBox(height: 56),
 
-              // Header
               Text(
                 'Welcome back',
                 style: context.textStyles.headlineMedium?.copyWith(
@@ -77,7 +74,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 40),
 
-              // Form — controllers live here now, not in a sub-widget
               Form(
                 key: _formKey,
                 child: Column(
@@ -90,8 +86,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       prefixIcon: Icons.email_outlined,
-                      onFieldSubmitted: (_) =>
-                          _passwordFocus.requestFocus(),
+                      onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
                     ),
                     const SizedBox(height: 16),
                     AppTextField(
@@ -103,7 +98,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       textInputAction: TextInputAction.done,
                       prefixIcon: Icons.lock_outline,
                       focusNode: _passwordFocus,
-                      // Keyboard done button also submits
                       onFieldSubmitted: (_) => _submit(),
                     ),
                   ],
@@ -112,7 +106,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 12),
 
-              // Forgot password
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -123,7 +116,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 24),
 
-              // Sign in button — directly calls _submit()
               AppButton(
                 label: 'Sign In',
                 isLoading: authState.isLoading,
@@ -132,7 +124,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 24),
 
-              // Divider
               Row(
                 children: [
                   const Expanded(child: Divider()),
@@ -151,19 +142,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 24),
 
-              // Google sign in
               SocialLoginButton(
                 isLoading: authState.isLoading,
-                onPressed: () {
-                  ref
-                      .read(authNotifierProvider.notifier)
-                      .signInWithGoogle();
-                },
+                onPressed: () =>
+                    ref.read(authNotifierProvider.notifier).signInWithGoogle(),
               ),
 
               const SizedBox(height: 40),
 
-              // Register link
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -187,51 +173,128 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _showForgotPasswordDialog(BuildContext context) {
+    // Pre-fill with whatever email is already typed in the login form
     final emailController =
-        TextEditingController(text: _emailController.text);
+        TextEditingController(text: _emailController.text.trim());
+    final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Reset Password'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("Enter your email and we'll send a reset link."),
-            const SizedBox(height: 16),
-            TextField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                hintText: 'you@example.com',
+      barrierDismissible: false, // prevent accidental dismiss while sending
+      builder: (dialogContext) {
+        // StatefulBuilder lets us manage loading state inside the dialog
+        // without rebuilding the whole screen
+        bool isSending = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Reset Password'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Enter your email address and we'll send you a link to reset your password.",
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autofocus: true,
+                      enabled: !isSending,
+                      validator: Validators.email,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        hintText: 'you@example.com',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                      onFieldSubmitted: (_) async {
+                        if (!(formKey.currentState?.validate() ?? false)) return;
+                        await _sendReset(
+                          dialogContext,
+                          emailController.text.trim(),
+                          setDialogState,
+                          (v) => isSending = v,
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              final success = await ref
-                  .read(authNotifierProvider.notifier)
-                  .sendPasswordReset(emailController.text);
-              if (!context.mounted) return;
-              if (success) {
-                context.showSnackBar(
-                    'Reset link sent — check your email.');
-              }
-            },
-            child: const Text('Send Link'),
-          ),
-        ],
-      ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      isSending ? null : () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isSending
+                      ? null
+                      : () async {
+                          if (!(formKey.currentState?.validate() ?? false)) {
+                            return;
+                          }
+                          await _sendReset(
+                            dialogContext,
+                            emailController.text.trim(),
+                            setDialogState,
+                            (v) => isSending = v,
+                          );
+                        },
+                  child: isSending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Send Link'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
+  }
+
+  /// Sends the reset email and handles success/failure inside the dialog.
+  Future<void> _sendReset(
+    BuildContext dialogContext,
+    String email,
+    void Function(void Function()) setDialogState,
+    void Function(bool) setLoading,
+  ) async {
+    // Show spinner inside dialog while waiting
+    setDialogState(() => setLoading(true));
+
+    final success =
+        await ref.read(authNotifierProvider.notifier).sendPasswordReset(email);
+
+    if (!dialogContext.mounted) return;
+
+    if (success) {
+      // Close dialog first, then show confirmation on the login screen
+      Navigator.pop(dialogContext);
+      if (context.mounted) {
+        context.showSnackBar(
+          'Reset link sent to $email — check your inbox and spam folder.',
+        );
+      }
+    } else {
+      // Keep dialog open, show error inside it so the user can correct the email
+      setDialogState(() => setLoading(false));
+      final error = ref.read(authNotifierProvider).errorMessage ??
+          'Could not send reset email. Please try again.';
+      ScaffoldMessenger.of(dialogContext).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Theme.of(dialogContext).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }

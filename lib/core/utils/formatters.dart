@@ -18,8 +18,15 @@ class Formatters {
       DateFormat('d MMM yyyy').format(date);
 
   /// 22 Jan 2026 · 14:30
-  static String dateTime(DateTime date) =>
-      DateFormat('d MMM yyyy · HH:mm').format(date);
+  static String dateTime(DateTime dt) {
+    return '${dt.day} ${_month(dt.month)} ${dt.year}, ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  static String _month(int m) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun',
+                     'Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[m - 1];
+  }
 
   /// ORD-00042
   static String orderId(String rawId) {

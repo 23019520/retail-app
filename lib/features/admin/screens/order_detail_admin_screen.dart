@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/order_model.dart';
 import '../../../core/utils/formatters.dart';
-import '../../../core/widgets/app_error_widget.dart';
-import '../../../core/widgets/app_loading.dart';
+import '../../../core/widgets/app_shimmer.dart';
+import '../../../core/widgets/app_states.dart';
+import '../../../theme/app_theme.dart';
 import '../../orders/providers/orders_provider.dart';
 import '../../orders/widgets/order_status_badge.dart';
 import '../providers/admin_orders_provider.dart';
@@ -17,11 +18,16 @@ class OrderDetailAdminScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Uses orderByIdProvider from orders_provider — same as the original screen.
     final orderAsync = ref.watch(orderByIdProvider(orderId));
 
     return orderAsync.when(
-      loading: () => const Scaffold(body: AppLoading()),
+      loading: () => const Scaffold(
+        backgroundColor: AppColors.backgroundBase,
+        body: AppLoading(),
+      ),
       error: (_, __) => Scaffold(
+        backgroundColor: AppColors.backgroundBase,
         appBar: AppBar(),
         body: AppErrorWidget(
           message: 'Could not load order.',
@@ -31,37 +37,37 @@ class OrderDetailAdminScreen extends ConsumerWidget {
       data: (order) {
         if (order == null) {
           return Scaffold(
+            backgroundColor: AppColors.backgroundBase,
             appBar: AppBar(),
             body: const AppErrorWidget(message: 'Order not found.'),
           );
         }
-        return _AdminOrderDetail(order: order);
+        return _AdminOrderDetailContent(order: order);
       },
     );
   }
 }
 
-class _AdminOrderDetail extends ConsumerWidget {
-  const _AdminOrderDetail({required this.order});
+class _AdminOrderDetailContent extends ConsumerWidget {
+  const _AdminOrderDetailContent({required this.order});
 
   final OrderModel order;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colors = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-
     return Scaffold(
+      backgroundColor: AppColors.backgroundBase,
       appBar: AppBar(
         title: Text(
           Formatters.orderId(order.id),
           style: const TextStyle(
-              fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.0,
+          ),
         ),
         actions: [
-          // Quick status update from app bar
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: AppSpacing.md),
             child: StatusDropdown(
               currentStatus: order.status,
               onChanged: (newStatus) async {
@@ -69,16 +75,13 @@ class _AdminOrderDetail extends ConsumerWidget {
                     .read(orderStatusNotifierProvider)
                     .updateStatus(order.id, newStatus);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(success
-                          ? 'Status updated to ${newStatus.label}'
-                          : 'Failed to update status'),
-                      backgroundColor:
-                          success ? colors.primary : colors.error,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(success
+                        ? 'Status updated to ${newStatus.label}'
+                        : 'Failed to update status'),
+                    backgroundColor:
+                        success ? AppColors.primary : AppColors.error,
+                  ));
                 }
               },
             ),
@@ -86,11 +89,11 @@ class _AdminOrderDetail extends ConsumerWidget {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppSpacing.base),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Status + timing ──────────────────────────────────────
+            // ── Status + date ──────────────────────────────────────────
             _Card(
               child: Row(
                 children: [
@@ -98,24 +101,26 @@ class _AdminOrderDetail extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const _Label('Current Status'),
-                        const SizedBox(height: 6),
-                        OrderStatusBadge(
-                            status: order.status, large: true),
+                        const _SectionTitle('Status'),
+                        const SizedBox(height: AppSpacing.xs),
+                        OrderStatusBadge(status: order.status, large: true),
                       ],
                     ),
                   ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const _Label('Placed'),
-                      const SizedBox(height: 6),
+                      const _SectionTitle('Placed'),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                         order.createdAt != null
                             ? Formatters.dateTime(order.createdAt!)
                             : '—',
-                        style: text.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
                         textAlign: TextAlign.end,
                       ),
                     ],
@@ -124,82 +129,85 @@ class _AdminOrderDetail extends ConsumerWidget {
               ),
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.md),
 
-            // ── Customer info ────────────────────────────────────────
+            // ── Customer / delivery info ───────────────────────────────
             _Card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _CardTitle('Customer'),
-                  const SizedBox(height: 12),
+                  const _SectionTitle('Customer'),
+                  const SizedBox(height: AppSpacing.md),
                   _InfoRow(
-                      icon: Icons.person_outline_rounded,
-                      label: 'User ID: ${order.userId}'),
+                    icon: Icons.person_outline_rounded,
+                    label: 'User ID: ${order.userId}',
+                  ),
                   if (order.deliveryAddress != null) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.sm),
                     _InfoRow(
                       icon: Icons.location_on_outlined,
                       label: order.deliveryAddress!,
                     ),
                   ],
-                  if (order.notes != null &&
-                      order.notes!.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    _InfoRow(
-                      icon: Icons.notes_rounded,
-                      label: order.notes!,
-                    ),
+                  if (order.notes != null && order.notes!.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    _InfoRow(icon: Icons.notes_rounded, label: order.notes!),
                   ],
                 ],
               ),
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.md),
 
-            // ── Order items ──────────────────────────────────────────
+            // ── Items ──────────────────────────────────────────────────
             _Card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _CardTitle(
+                  _SectionTitle(
                       '${order.itemCount} Item${order.itemCount == 1 ? '' : 's'}'),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   ...order.items.map((item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
                         child: Row(
                           children: [
                             Container(
-                              width: 36,
-                              height: 36,
+                              width: 30,
+                              height: 30,
                               decoration: BoxDecoration(
-                                color: colors.primaryContainer
-                                    .withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(8),
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.chip),
                               ),
                               child: Center(
                                 child: Text(
                                   '×${item.quantity}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: colors.primary,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primary,
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.md),
                             Expanded(
                               child: Text(
                                 item.productName,
-                                style: text.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w500),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
                             ),
                             Text(
                               Formatters.currency(item.subtotal),
-                              style: text.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                           ],
                         ),
@@ -208,89 +216,82 @@ class _AdminOrderDetail extends ConsumerWidget {
               ),
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.md),
 
-            // ── Totals ───────────────────────────────────────────────
+            // ── Payment + totals ───────────────────────────────────────
             _Card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _CardTitle('Payment'),
-                  const SizedBox(height: 12),
+                  const _SectionTitle('Payment'),
+                  const SizedBox(height: AppSpacing.md),
                   _InfoRow(
                     icon: Icons.credit_card_outlined,
                     label: order.paymentMethod.label,
                   ),
-                  const SizedBox(height: 12),
-                  Divider(
-                      color: colors.outline.withValues(alpha: 0.15)),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: AppSpacing.md),
+                  Container(height: 0.5, color: AppColors.divider),
+                  const SizedBox(height: AppSpacing.md),
                   _TotalRow(
-                      label: 'Subtotal',
-                      value: Formatters.currency(order.subtotal),
-                      colors: colors),
-                  const SizedBox(height: 6),
+                    label: 'Subtotal',
+                    value: Formatters.currency(order.subtotal),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
                   _TotalRow(
                     label: 'Delivery',
                     value: order.deliveryFee == 0
                         ? 'Free'
                         : Formatters.currency(order.deliveryFee),
-                    colors: colors,
                   ),
-                  const SizedBox(height: 10),
-                  Divider(
-                      color: colors.outline.withValues(alpha: 0.15)),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: AppSpacing.md),
+                  Container(height: 0.5, color: AppColors.divider),
+                  const SizedBox(height: AppSpacing.md),
                   _TotalRow(
                     label: 'Total',
                     value: Formatters.currency(order.total),
-                    colors: colors,
                     bold: true,
-                    valueColor: colors.primary,
+                    valueColor: AppColors.primary,
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.md),
 
-            // ── Status history actions ────────────────────────────────
+            // ── Status action buttons ──────────────────────────────────
             if (order.status != OrderStatus.completed &&
                 order.status != OrderStatus.cancelled)
               _Card(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _CardTitle('Update Status'),
-                    const SizedBox(height: 12),
+                    const _SectionTitle('Update Status'),
+                    const SizedBox(height: AppSpacing.md),
                     _StatusActionButton(
                       order: order,
                       label: _nextStatusLabel(order.status),
                       nextStatus: _nextStatus(order.status),
-                      colors: colors,
                     ),
-                    const SizedBox(height: 10),
-                    if (order.status != OrderStatus.cancelled)
-                      _StatusActionButton(
-                        order: order,
-                        label: 'Cancel Order',
-                        nextStatus: OrderStatus.cancelled,
-                        colors: colors,
-                        isDestructive: true,
-                      ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _StatusActionButton(
+                      order: order,
+                      label: 'Cancel Order',
+                      nextStatus: OrderStatus.cancelled,
+                      isDestructive: true,
+                    ),
                   ],
                 ),
               ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: AppSpacing.xl),
           ],
         ),
       ),
     );
   }
 
-  String _nextStatusLabel(OrderStatus current) {
-    switch (current) {
+  String _nextStatusLabel(OrderStatus s) {
+    switch (s) {
       case OrderStatus.pending:   return 'Confirm Order';
       case OrderStatus.confirmed: return 'Mark as Preparing';
       case OrderStatus.preparing: return 'Mark as Ready';
@@ -299,8 +300,8 @@ class _AdminOrderDetail extends ConsumerWidget {
     }
   }
 
-  OrderStatus _nextStatus(OrderStatus current) {
-    switch (current) {
+  OrderStatus _nextStatus(OrderStatus s) {
+    switch (s) {
       case OrderStatus.pending:   return OrderStatus.confirmed;
       case OrderStatus.confirmed: return OrderStatus.preparing;
       case OrderStatus.preparing: return OrderStatus.ready;
@@ -310,154 +311,111 @@ class _AdminOrderDetail extends ConsumerWidget {
   }
 }
 
-// ── Action button ─────────────────────────────────────────────────────────────
+// ── Status action button ──────────────────────────────────────────────────────
 
 class _StatusActionButton extends ConsumerWidget {
   const _StatusActionButton({
     required this.order,
     required this.label,
     required this.nextStatus,
-    required this.colors,
     this.isDestructive = false,
   });
 
   final OrderModel order;
   final String label;
   final OrderStatus nextStatus;
-  final ColorScheme colors;
   final bool isDestructive;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    Future<void> doUpdate() async {
+      final success = await ref
+          .read(orderStatusNotifierProvider)
+          .updateStatus(order.id, nextStatus);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(success ? 'Order ${nextStatus.label}' : 'Update failed'),
+          backgroundColor: success ? AppColors.primary : AppColors.error,
+        ));
+      }
+    }
+
+    if (isDestructive) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.error,
+            side: const BorderSide(color: AppColors.error),
+            minimumSize: const Size(double.infinity, 48),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.button)),
+          ),
+          onPressed: () async {
+            final confirmed = await showConfirmationDialog(
+              context,
+              title: 'Cancel order?',
+              message: 'This cannot be undone.',
+              confirmLabel: 'Cancel order',
+              isDestructive: true,
+            );
+            if (confirmed) doUpdate();
+          },
+          child: Text(label),
+        ),
+      );
+    }
+
     return SizedBox(
       width: double.infinity,
-      child: isDestructive
-          ? OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: colors.error,
-                side: BorderSide(color: colors.error),
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Cancel order?'),
-                    content: const Text(
-                        'This action cannot be undone.'),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Keep order')),
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                            backgroundColor: colors.error),
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Cancel order'),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed == true && context.mounted) {
-                  await ref
-                      .read(orderStatusNotifierProvider)
-                      .updateStatus(order.id, nextStatus);
-                }
-              },
-              child: Text(label),
-            )
-          : FilledButton(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () async {
-                final success = await ref
-                    .read(orderStatusNotifierProvider)
-                    .updateStatus(order.id, nextStatus);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(success
-                          ? 'Order ${nextStatus.label}'
-                          : 'Update failed'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor:
-                          success ? colors.primary : colors.error,
-                    ),
-                  );
-                }
-              },
-              child: Text(label),
-            ),
+      child: FilledButton(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: const Color(0xFF0E2419),
+          minimumSize: const Size(double.infinity, 48),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.button)),
+        ),
+        onPressed: doUpdate,
+        child: Text(label),
+      ),
     );
   }
 }
 
-// ── Small reusable sub-widgets ────────────────────────────────────────────────
+// ── Sub-widgets ───────────────────────────────────────────────────────────────
 
 class _Card extends StatelessWidget {
   const _Card({required this.child});
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outline.withValues(alpha: 0.1)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.base),
+        decoration: BoxDecoration(
+          color: AppColors.backgroundCard,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.divider, width: 0.5),
+        ),
+        child: child,
+      );
 }
 
-class _CardTitle extends StatelessWidget {
-  const _CardTitle(this.title);
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: Theme.of(context)
-          .textTheme
-          .titleSmall
-          ?.copyWith(fontWeight: FontWeight.bold),
-    );
-  }
-}
-
-class _Label extends StatelessWidget {
-  const _Label(this.text);
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
   final String text;
 
   @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.5),
-          ),
-    );
-  }
+  Widget build(BuildContext context) => Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textMuted,
+          letterSpacing: 0.4,
+        ),
+      );
 }
 
 class _InfoRow extends StatelessWidget {
@@ -466,61 +424,57 @@ class _InfoRow extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18,
-            color: colors.onSurface.withValues(alpha: 0.5)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurface.withValues(alpha: 0.8),
-                  )),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: AppColors.textMuted),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      );
 }
 
 class _TotalRow extends StatelessWidget {
   const _TotalRow({
     required this.label,
     required this.value,
-    required this.colors,
     this.bold = false,
     this.valueColor,
   });
   final String label;
   final String value;
-  final ColorScheme colors;
   final bool bold;
   final Color? valueColor;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: bold
-                      ? null
-                      : colors.onSurface.withValues(alpha: 0.6),
-                  fontWeight:
-                      bold ? FontWeight.bold : FontWeight.normal,
-                  fontSize: bold ? 16 : null,
-                )),
-        Text(value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight:
-                      bold ? FontWeight.bold : FontWeight.w600,
-                  color: valueColor,
-                  fontSize: bold ? 18 : null,
-                )),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: bold ? 15 : 13,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+              color: bold ? AppColors.textPrimary : AppColors.textMuted,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: bold ? 18 : 13,
+              fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+              color: valueColor ?? AppColors.textSecondary,
+            ),
+          ),
+        ],
+      );
 }

@@ -3,11 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
+import 'package:go_router/go_router.dart';
+
+import '../../../core/constants/route_constants.dart';
 import '../../../core/models/business_model.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/app_loading.dart';
+import '../../../core/widgets/app_shimmer.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../../theme/app_theme.dart';
 import '../providers/admin_settings_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -18,15 +22,15 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
+  final _formKey    = GlobalKey<FormState>();
+  final _nameCtrl   = TextEditingController();
+  final _phoneCtrl  = TextEditingController();
+  final _emailCtrl  = TextEditingController();
   final _addressCtrl = TextEditingController();
 
   File? _newLogoFile;
   bool _initialised = false;
-  bool _isSaving = false;
+  bool _isSaving    = false;
 
   @override
   void dispose() {
@@ -40,9 +44,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _initFromBusiness(BusinessModel business) {
     if (_initialised) return;
     _initialised = true;
-    _nameCtrl.text = business.name;
-    _phoneCtrl.text = business.phone ?? '';
-    _emailCtrl.text = business.email ?? '';
+    _nameCtrl.text    = business.name;
+    _phoneCtrl.text   = business.phone   ?? '';
+    _emailCtrl.text   = business.email   ?? '';
     _addressCtrl.text = business.address ?? '';
   }
 
@@ -51,27 +55,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       source: ImageSource.gallery,
       imageQuality: 80,
     );
-    if (picked != null) {
-      setState(() => _newLogoFile = File(picked.path));
-    }
+    if (picked != null) setState(() => _newLogoFile = File(picked.path));
   }
 
   Future<void> _save(BusinessModel current) async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-
     setState(() => _isSaving = true);
 
     final updated = current.copyWith(
-      name: _nameCtrl.text.trim(),
-      phone: _phoneCtrl.text.trim().isNotEmpty
-          ? _phoneCtrl.text.trim()
-          : null,
-      email: _emailCtrl.text.trim().isNotEmpty
-          ? _emailCtrl.text.trim()
-          : null,
-      address: _addressCtrl.text.trim().isNotEmpty
-          ? _addressCtrl.text.trim()
-          : null,
+      name:    _nameCtrl.text.trim(),
+      phone:   _phoneCtrl.text.trim().isNotEmpty ? _phoneCtrl.text.trim() : null,
+      email:   _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : null,
+      address: _addressCtrl.text.trim().isNotEmpty ? _addressCtrl.text.trim() : null,
     );
 
     final success = await ref
@@ -80,16 +75,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (mounted) {
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              Text(success ? 'Settings saved' : 'Failed to save settings'),
-          backgroundColor: success
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(success ? 'Settings saved' : 'Failed to save settings'),
+        backgroundColor: success ? AppColors.primary : AppColors.error,
+      ));
       if (success) setState(() => _newLogoFile = null);
     }
   }
@@ -97,54 +86,77 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(adminSettingsProvider);
-    final colors = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
 
     return settingsAsync.when(
-      loading: () => const Scaffold(body: AppLoading()),
+      loading: () => const Scaffold(
+        backgroundColor: AppColors.backgroundBase,
+        body: AppLoading(),
+      ),
       error: (_, __) => const Scaffold(
-          body: Center(child: Text('Could not load settings.'))),
+        backgroundColor: AppColors.backgroundBase,
+        body: Center(
+          child: Text(
+            'Could not load settings.',
+            style: TextStyle(color: AppColors.textMuted),
+          ),
+        ),
+      ),
       data: (business) {
         _initFromBusiness(business);
 
         return Scaffold(
+          backgroundColor: AppColors.backgroundBase,
           body: SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppSpacing.base),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Settings',
-                        style: text.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 24),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Settings',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ),
+                        _ViewStoreButton(
+                          onTap: () => context.go(RouteConstants.home),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
 
-                    // ── Logo ───────────────────────────────────────
+                    // ── Logo ───────────────────────────────────────────
                     const _SectionTitle('Business Logo'),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.md),
                     _LogoPicker(
                       existingUrl: business.logoUrl,
                       newFile: _newLogoFile,
                       onPick: _pickLogo,
                       onRemove: () => setState(() => _newLogoFile = null),
-                      colors: colors,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.lg),
 
-                    // ── Business info ──────────────────────────────
+                    // ── Business info ──────────────────────────────────
                     const _SectionTitle('Business Information'),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.md),
                     AppTextField(
                       label: 'Business Name',
                       controller: _nameCtrl,
-                      validator: (v) =>
-                          Validators.required(v, fieldName: 'Name'),
+                      validator: (v) => Validators.required(v, fieldName: 'Name'),
                       prefixIcon: Icons.store_outlined,
                       textInputAction: TextInputAction.next,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.md),
                     AppTextField(
                       label: 'Phone Number',
                       controller: _phoneCtrl,
@@ -153,7 +165,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       prefixIcon: Icons.phone_outlined,
                       textInputAction: TextInputAction.next,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.md),
                     AppTextField(
                       label: 'Email Address',
                       controller: _emailCtrl,
@@ -165,7 +177,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       prefixIcon: Icons.email_outlined,
                       textInputAction: TextInputAction.next,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.md),
                     AppTextField(
                       label: 'Address',
                       controller: _addressCtrl,
@@ -174,37 +186,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       textInputAction: TextInputAction.done,
                     ),
 
-                    const SizedBox(height: 28),
+                    const SizedBox(height: AppSpacing.lg),
 
-                    // ── Branding colours preview ───────────────────
-                    const _SectionTitle('Brand Colors'),
-                    const SizedBox(height: 12),
-                    _ColorPreview(
-                      primaryColor: colors.primary,
-                      secondaryColor: colors.secondary,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        'Colors are set from your business config in Firestore. '
-                        'Full color picker coming in a future update.',
-                        style: text.bodySmall?.copyWith(
-                          color:
-                              colors.onSurface.withValues(alpha: 0.5),
+                    // ── Brand colour preview ────────────────────────────
+                    const _SectionTitle('Brand Colours'),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        _ColorSwatch(
+                          label: 'Primary',
+                          color: Theme.of(context).colorScheme.primary,
                         ),
-                      ),
+                        const SizedBox(width: AppSpacing.md),
+                        _ColorSwatch(
+                          label: 'Secondary',
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    const Text(
+                      'Colours are defined in your Firestore business config. Full colour picker coming soon.',
+                      style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.5),
                     ),
 
-                    const SizedBox(height: 28),
+                    const SizedBox(height: AppSpacing.xl),
 
-                    // ── Save ──────────────────────────────────────
                     AppButton(
                       label: 'Save Settings',
                       isLoading: _isSaving,
                       onPressed: () => _save(business),
                     ),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: AppSpacing.xl),
                   ],
                 ),
               ),
@@ -216,22 +230,70 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-// ── Sub-widgets ───────────────────────────────────────────────────────────────
+// ── View Store Button ─────────────────────────────────────────────────────────
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.title);
-  final String title;
+class _ViewStoreButton extends StatelessWidget {
+  const _ViewStoreButton({required this.onTap});
+
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: Theme.of(context)
-          .textTheme
-          .titleSmall
-          ?.copyWith(fontWeight: FontWeight.bold),
+    return GestureDetector(
+      onTap: onTap,
+      child: Semantics(
+        button: true,
+        label: 'View store',
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppRadius.button),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.3),
+              width: 0.5,
+            ),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.storefront_outlined, size: 14, color: AppColors.primary),
+              SizedBox(width: AppSpacing.xs),
+              Text(
+                'View Store',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
+}
+
+// ── Sub-widgets ───────────────────────────────────────────────────────────────
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textSecondary,
+      letterSpacing: 0.3,
+    ),
+  );
 }
 
 class _LogoPicker extends StatelessWidget {
@@ -240,14 +302,12 @@ class _LogoPicker extends StatelessWidget {
     required this.newFile,
     required this.onPick,
     required this.onRemove,
-    required this.colors,
   });
 
   final String? existingUrl;
-  final File? newFile;
+  final File?   newFile;
   final VoidCallback onPick;
   final VoidCallback onRemove;
-  final ColorScheme colors;
 
   @override
   Widget build(BuildContext context) {
@@ -255,53 +315,55 @@ class _LogoPicker extends StatelessWidget {
 
     return Row(
       children: [
-        // Preview
         Container(
-          width: 80,
-          height: 80,
+          width: 72,
+          height: 72,
           decoration: BoxDecoration(
-            color: colors.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-                color: colors.outline.withValues(alpha: 0.2)),
+            color: AppColors.backgroundCard,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(color: AppColors.divider, width: 0.5),
           ),
           clipBehavior: Clip.antiAlias,
           child: hasImage
               ? newFile != null
                   ? Image.file(newFile!, fit: BoxFit.cover)
                   : Image.network(existingUrl!, fit: BoxFit.cover)
-              : Icon(
+              : const Icon(
                   Icons.store_outlined,
-                  size: 36,
-                  color: colors.onSurfaceVariant.withValues(alpha: 0.5),
+                  size: 30,
+                  color: AppColors.textMuted,
                 ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: AppSpacing.base),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             OutlinedButton.icon(
               onPressed: onPick,
-              icon: const Icon(Icons.upload_rounded, size: 18),
-              label:
-                  Text(hasImage ? 'Change Logo' : 'Upload Logo'),
+              icon: const Icon(Icons.upload_rounded, size: 16),
+              label: Text(hasImage ? 'Change Logo' : 'Upload Logo'),
               style: OutlinedButton.styleFrom(
                 minimumSize: Size.zero,
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10),
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(AppRadius.button),
+                ),
               ),
             ),
             if (hasImage) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.xs),
               TextButton(
                 onPressed: onRemove,
                 style: TextButton.styleFrom(
-                  foregroundColor: colors.error,
+                  foregroundColor: AppColors.error,
                   minimumSize: Size.zero,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.xs,
+                  ),
                 ),
                 child: const Text('Remove', style: TextStyle(fontSize: 12)),
               ),
@@ -313,56 +375,38 @@ class _LogoPicker extends StatelessWidget {
   }
 }
 
-class _ColorPreview extends StatelessWidget {
-  const _ColorPreview({
-    required this.primaryColor,
-    required this.secondaryColor,
-  });
-  final Color primaryColor;
-  final Color secondaryColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _ColorSwatch(label: 'Primary', color: primaryColor),
-        const SizedBox(width: 12),
-        _ColorSwatch(label: 'Secondary', color: secondaryColor),
-      ],
-    );
-  }
-}
-
 class _ColorSwatch extends StatelessWidget {
   const _ColorSwatch({required this.label, required this.color});
   final String label;
-  final Color color;
+  final Color  color;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Container(
-          width: 36,
-          height: 36,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadius.chip),
             boxShadow: [
               BoxShadow(
                 color: color.withValues(alpha: 0.3),
-                blurRadius: 6,
+                blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.sm),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          ),
         ),
       ],
     );

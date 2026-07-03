@@ -1,6 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/order_model.dart';
+import '../../../core/constants/firestore_constants.dart';
 import '../../cart/providers/checkout_provider.dart';
 
 /// All orders — admin only.
@@ -27,9 +29,25 @@ class OrderStatusNotifier {
   OrderStatusNotifier(this._ref);
   final Ref _ref;
 
+  final _firestore = FirebaseFirestore.instance;
+
+  /// Updates order status and appends a timestamped entry to statusHistory.
   Future<bool> updateStatus(String orderId, OrderStatus status) async {
     try {
-      await _ref.read(orderServiceProvider).updateOrderStatus(orderId, status);
+      final newEvent = StatusEvent(
+        status: status,
+        timestamp: DateTime.now(),
+      );
+
+      await _firestore
+          .collection(FirestoreConstants.orders)
+          .doc(orderId)
+          .update({
+        FirestoreConstants.status: status.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+        // FieldValue.arrayUnion appends without reading first
+        'statusHistory': FieldValue.arrayUnion([newEvent.toJson()]),
+      });
       return true;
     } catch (_) {
       return false;

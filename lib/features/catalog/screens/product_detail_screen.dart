@@ -5,12 +5,15 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/route_constants.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/add_to_cart_pill.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/app_error_widget.dart';
-import '../../../core/widgets/app_loading.dart';
+import '../../../core/widgets/app_product_image.dart';
+import '../../../core/widgets/app_shimmer.dart';
+import '../../../core/widgets/condition_badge.dart';
+import '../../../core/widgets/condition_meter.dart';
+import '../../../theme/app_theme.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../providers/products_provider.dart';
-import '../widgets/product_image_carousel.dart';
 
 class ProductDetailScreen extends ConsumerStatefulWidget {
   const ProductDetailScreen({super.key, required this.productId});
@@ -29,20 +32,31 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     final productAsync = ref.watch(productByIdProvider(widget.productId));
 
     return productAsync.when(
-      loading: () => const Scaffold(body: AppLoading()),
+      loading: () => const Scaffold(
+        backgroundColor: AppColors.backgroundBase,
+        body: AppLoading(),
+      ),
       error: (_, __) => Scaffold(
+        backgroundColor: AppColors.backgroundBase,
         appBar: AppBar(),
-        body: AppErrorWidget(
-          message: 'Could not load product.',
-          onRetry: () =>
-              ref.invalidate(productByIdProvider(widget.productId)),
+        body: const Center(
+          child: Text(
+            'Could not load product.',
+            style: TextStyle(color: AppColors.textMuted),
+          ),
         ),
       ),
       data: (product) {
         if (product == null) {
           return Scaffold(
+            backgroundColor: AppColors.backgroundBase,
             appBar: AppBar(),
-            body: const AppErrorWidget(message: 'Product not found.'),
+            body: const Center(
+              child: Text(
+                'Product not found.',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+            ),
           );
         }
         return _ProductDetailContent(
@@ -68,141 +82,188 @@ class _ProductDetailContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colors = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
     final screenHeight = MediaQuery.sizeOf(context).height;
 
+    // ── Real condition data from the product model — both nullable, since
+    // not every product type (e.g. tools) tracks condition or battery.
+    final grade = product.condition != null
+        ? _toConditionGrade(product.condition!)
+        : null;
+    final batteryHealth = product.batteryHealth;
+
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: AppColors.backgroundBase,
       body: Stack(
         children: [
-          // ── Scrollable content ──────────────────────────────────────
           CustomScrollView(
             slivers: [
-              // Image carousel with back button overlay
+              // ── Image with back/wishlist overlay ──────────────────────
               SliverAppBar(
-                expandedHeight: screenHeight * 0.42,
+                expandedHeight: screenHeight * 0.40,
                 pinned: true,
-                backgroundColor: colors.surface,
+                backgroundColor: AppColors.backgroundBase,
                 elevation: 0,
+                scrolledUnderElevation: 0,
                 leading: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: _CircleIconButton(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  child: _CircleButton(
                     icon: Icons.arrow_back_ios_new_rounded,
-                    onTap: () => context.pop(),
+                    onTap: context.pop,
                   ),
                 ),
                 actions: [
                   Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: _CircleIconButton(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    child: _CircleButton(
                       icon: Icons.favorite_border_rounded,
                       onTap: () {},
                     ),
                   ),
                 ],
                 flexibleSpace: FlexibleSpaceBar(
-                  background: ProductImageCarousel(
+                  background: AppProductImageCarousel(
                     imageUrls: product.imageUrls,
-                    height: screenHeight * 0.42,
+                    height: screenHeight * 0.40,
                   ),
                 ),
               ),
 
-              // Product info
+              // ── Product info ───────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Container(
-                  decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(28),
+                  decoration: const BoxDecoration(
+                    color: AppColors.backgroundBase,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(AppRadius.sheet),
                     ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 120),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // ── Name + price row ──────────────────────────
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.base,
+                    AppSpacing.lg,
+                    AppSpacing.base,
+                    120, // space for sticky bottom bar
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Badges row ──────────────────────────────────────
+                      if (grade != null || batteryHealth != null || product.isInspected) ...[
+                        Wrap(
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.sm,
                           children: [
-                            Expanded(
-                              child: Text(
-                                product.name,
-                                style: text.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  height: 1.2,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Text(
-                              Formatters.currency(product.price),
-                              style: text.titleLarge?.copyWith(
-                                color: colors.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            if (grade != null) ConditionBadge(grade: grade),
+                            if (batteryHealth != null)
+                              BatteryBadge(health: batteryHealth),
+                            if (product.isInspected) const VerifiedBadge(),
                           ],
                         ),
-
-                        const SizedBox(height: 12),
-
-                        // ── Stock status ──────────────────────────────
-                        _StockStatus(product: product, colors: colors),
-
-                        const SizedBox(height: 24),
-                        Divider(color: colors.outline.withValues(alpha: 0.15)),
-                        const SizedBox(height: 20),
-
-                        // ── Description ───────────────────────────────
-                        Text(
-                          'Description',
-                          style: text.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          product.description.isNotEmpty
-                              ? product.description
-                              : 'No description available.',
-                          style: text.bodyMedium?.copyWith(
-                            color: colors.onSurface.withValues(alpha: 0.7),
-                            height: 1.6,
-                          ),
-                        ),
-
-                        const SizedBox(height: 32),
-
-                        // ── Quantity selector ─────────────────────────
-                        Row(
-                          children: [
-                            Text(
-                              'Quantity',
-                              style: text.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const Spacer(),
-                            _QuantitySelector(
-                              quantity: quantity,
-                              maxQuantity: product.stock,
-                              onChanged: onQuantityChanged,
-                              colors: colors,
-                            ),
-                          ],
-                        ),
+                        const SizedBox(height: AppSpacing.md),
                       ],
-                    ),
+
+                      // ── Name + price ────────────────────────────────────
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              product.name,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                                height: 1.25,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.base),
+                          Text(
+                            Formatters.currency(product.price),
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: AppSpacing.lg),
+
+                      // ── Condition Meter (signature element) ─────────────
+                      // Skipped entirely for product types that don't track
+                      // condition/battery (e.g. tools).
+                      if (grade != null || batteryHealth != null) ...[
+                        _ConditionSection(
+                          grade: grade,
+                          batteryHealth: batteryHealth,
+                          isInspected: product.isInspected,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        const _Divider(),
+                        const SizedBox(height: AppSpacing.lg),
+                      ],
+
+                      // ── Description ─────────────────────────────────────
+                      const Text(
+                        'About this item',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        product.description.isNotEmpty
+                            ? product.description
+                            : 'No description available.',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                          height: 1.65,
+                        ),
+                      ),
+
+                      const SizedBox(height: AppSpacing.lg),
+                      const _Divider(),
+                      const SizedBox(height: AppSpacing.lg),
+
+                      // ── Trust block ──────────────────────────────────────
+                      _TrustBlock(product: product),
+
+                      const SizedBox(height: AppSpacing.lg),
+                      const _Divider(),
+                      const SizedBox(height: AppSpacing.lg),
+
+                      // ── Quantity selector ────────────────────────────────
+                      Row(
+                        children: [
+                          const Text(
+                            'Quantity',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const Spacer(),
+                          _QuantitySelector(
+                            quantity: quantity,
+                            maxQuantity: product.stock,
+                            onChanged: onQuantityChanged,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
 
-          // ── Sticky bottom bar ───────────────────────────────────────
+          // ── Sticky bottom bar ─────────────────────────────────────────
           Positioned(
             bottom: 0,
             left: 0,
@@ -210,203 +271,229 @@ class _ProductDetailContent extends ConsumerWidget {
             child: _BottomBar(
               product: product,
               quantity: quantity,
-              colors: colors,
             ),
           ),
         ],
       ),
     );
   }
-}
 
-// ── Sub-widgets ─────────────────────────────────────────────────────────────
-
-class _StockStatus extends StatelessWidget {
-  const _StockStatus({required this.product, required this.colors});
-  final ProductModel product;
-  final ColorScheme colors;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!product.inStock) {
-      return _badge('Out of stock', colors.error);
+  ConditionGrade _toConditionGrade(ProductCondition c) {
+    switch (c) {
+      case ProductCondition.likeNew:   return ConditionGrade.likeNew;
+      case ProductCondition.excellent: return ConditionGrade.excellent;
+      case ProductCondition.good:      return ConditionGrade.good;
+      case ProductCondition.fair:      return ConditionGrade.fair;
     }
-    if (product.lowStock) {
-      return _badge('Only ${product.stock} left!', Colors.orange);
-    }
-    return _badge('In stock', Colors.green.shade600);
-  }
-
-  Widget _badge(String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
-class _QuantitySelector extends StatelessWidget {
-  const _QuantitySelector({
-    required this.quantity,
-    required this.maxQuantity,
-    required this.onChanged,
-    required this.colors,
+// ── Condition Section ─────────────────────────────────────────────────────────
+
+class _ConditionSection extends StatelessWidget {
+  const _ConditionSection({
+    required this.grade,
+    required this.batteryHealth,
+    required this.isInspected,
   });
 
-  final int quantity;
-  final int maxQuantity;
-  final ValueChanged<int> onChanged;
-  final ColorScheme colors;
+  // At least one of these is guaranteed non-null by the caller's guard
+  // (grade != null || batteryHealth != null), but both stay nullable here
+  // since accessories may have a grade with no battery, and vice versa.
+  final ConditionGrade? grade;
+  final double? batteryHealth;
+  final bool isInspected;
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.all(AppSpacing.base),
       decoration: BoxDecoration(
-        border: Border.all(color: colors.outline.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.backgroundCard,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Row(
         children: [
-          _QtyButton(
-            icon: Icons.remove_rounded,
-            onTap: quantity > 1 ? () => onChanged(quantity - 1) : null,
-            colors: colors,
+          // Signature condition meter — falls back to 'excellent' styling
+          // only as a defensive default; in practice grade is always set
+          // whenever this section renders for a condition-tracked item.
+          ConditionMeter(
+            grade: grade ?? ConditionGrade.excellent,
+            batteryHealth: batteryHealth,
+            size: 108,
           ),
-          SizedBox(
-            width: 40,
-            child: Text(
-              '$quantity',
-              textAlign: TextAlign.center,
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Condition Report',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                if (grade != null)
+                  _ConditionRow(
+                    label: 'Grade',
+                    value: grade!.label,
+                    valueColor: grade!.color,
+                  ),
+                if (batteryHealth != null)
+                  _ConditionRow(
+                    label: 'Battery',
+                    value: '${(batteryHealth! * 100).round()}% health',
+                    valueColor: AppColors.secondary,
+                  ),
+                _ConditionRow(
+                  label: 'Inspected',
+                  value: isInspected ? 'Verified ✓' : 'Not yet verified',
+                  valueColor: isInspected ? AppColors.primary : AppColors.textMuted,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConditionRow extends StatelessWidget {
+  const _ConditionRow({
+    required this.label,
+    required this.value,
+    required this.valueColor,
+  });
+
+  final String label;
+  final String value;
+  final Color valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: valueColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Trust Block ───────────────────────────────────────────────────────────────
+
+class _TrustBlock extends StatelessWidget {
+  const _TrustBlock({required this.product});
+
+  final ProductModel product;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <({IconData icon, String label})>[
+      if (product.hasReturnPolicy)
+        (
+          icon: Icons.replay_rounded,
+          label: '${product.returnPolicyDays}-day returns',
+        ),
+      if (product.hasWarranty)
+        (
+          icon: Icons.shield_outlined,
+          label: '${product.warrantyMonths}-month warranty',
+        ),
+      if (product.deliveredFrom.isNotEmpty)
+        (
+          icon: Icons.local_shipping_outlined,
+          label: 'Ships from ${product.deliveredFrom}',
+        ),
+    ];
+
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      children: items.map((item) => Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Row(
+          children: [
+            Icon(item.icon, size: 16, color: AppColors.primary),
+            const SizedBox(width: AppSpacing.sm),
+            Text(
+              item.label,
               style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
               ),
             ),
-          ),
-          _QtyButton(
-            icon: Icons.add_rounded,
-            onTap: quantity < maxQuantity ? () => onChanged(quantity + 1) : null,
-            colors: colors,
-          ),
-        ],
-      ),
+          ],
+        ),
+      )).toList(),
     );
   }
 }
 
-class _QtyButton extends StatelessWidget {
-  const _QtyButton({
-    required this.icon,
-    required this.onTap,
-    required this.colors,
-  });
-  final IconData icon;
-  final VoidCallback? onTap;
-  final ColorScheme colors;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: onTap != null
-              ? colors.primary.withValues(alpha: 0.08)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          icon,
-          size: 18,
-          color: onTap != null
-              ? colors.primary
-              : colors.onSurface.withValues(alpha: 0.25),
-        ),
-      ),
-    );
-  }
-}
+// ── Bottom Bar ────────────────────────────────────────────────────────────────
 
 class _BottomBar extends ConsumerWidget {
-  const _BottomBar({
-    required this.product,
-    required this.quantity,
-    required this.colors,
-  });
+  const _BottomBar({required this.product, required this.quantity});
+
   final ProductModel product;
   final int quantity;
-  final ColorScheme colors;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       padding: EdgeInsets.fromLTRB(
-        24,
-        16,
-        24,
-        MediaQuery.viewPaddingOf(context).bottom + 16,
+        AppSpacing.base,
+        AppSpacing.md,
+        AppSpacing.base,
+        MediaQuery.viewPaddingOf(context).bottom + AppSpacing.md,
       ),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.07),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          ),
-        ],
+      decoration: const BoxDecoration(
+        color: AppColors.backgroundCard,
+        border: Border(
+          top: BorderSide(color: AppColors.divider, width: 0.5),
+        ),
       ),
       child: Row(
         children: [
-          // Total price
+          // Total
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
+              const Text(
                 'Total',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: colors.onSurface.withValues(alpha: 0.5),
-                ),
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
               ),
               Text(
                 Formatters.currency(product.price * quantity),
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: colors.primary,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
                 ),
               ),
             ],
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: AppSpacing.base),
 
-          // Add to cart button
+          // Add to cart button — shows premium pill on success
           Expanded(
             child: AppButton(
               label: product.inStock ? 'Add to Cart' : 'Out of Stock',
@@ -418,18 +505,10 @@ class _BottomBar extends ConsumerWidget {
                           .read(cartNotifierProvider.notifier)
                           .addProduct(product);
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${product.name} added to cart'),
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: colors.primary,
-                            action: SnackBarAction(
-                              label: 'View Cart',
-                              textColor: colors.onPrimary,
-                              onPressed: () =>
-                                  context.go(RouteConstants.cart),
-                            ),
-                          ),
+                        // Premium floating pill instead of SnackBar
+                        AddToCartPill.show(
+                          context,
+                          productName: product.name,
                         );
                       }
                     }
@@ -442,8 +521,98 @@ class _BottomBar extends ConsumerWidget {
   }
 }
 
-class _CircleIconButton extends StatelessWidget {
-  const _CircleIconButton({required this.icon, required this.onTap});
+// ── Quantity Selector ─────────────────────────────────────────────────────────
+
+class _QuantitySelector extends StatelessWidget {
+  const _QuantitySelector({
+    required this.quantity,
+    required this.maxQuantity,
+    required this.onChanged,
+  });
+
+  final int quantity;
+  final int maxQuantity;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.divider, width: 1),
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        color: AppColors.backgroundCard,
+      ),
+      child: Row(
+        children: [
+          _QtyBtn(
+            icon: Icons.remove_rounded,
+            onTap: quantity > 1 ? () => onChanged(quantity - 1) : null,
+          ),
+          SizedBox(
+            width: 36,
+            child: Text(
+              '$quantity',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          _QtyBtn(
+            icon: Icons.add_rounded,
+            onTap: quantity < maxQuantity ? () => onChanged(quantity + 1) : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QtyBtn extends StatelessWidget {
+  const _QtyBtn({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: active ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: active ? AppColors.primary : AppColors.divider,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shared sub-widgets ────────────────────────────────────────────────────────
+
+class _Divider extends StatelessWidget {
+  const _Divider();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 0.5,
+    color: AppColors.divider,
+  );
+}
+
+class _CircleButton extends StatelessWidget {
+  const _CircleButton({required this.icon, required this.onTap});
+
   final IconData icon;
   final VoidCallback onTap;
 
@@ -452,20 +621,14 @@ class _CircleIconButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 40,
-        height: 40,
+        width: 38,
+        height: 38,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.9),
+          color: AppColors.backgroundSheet.withValues(alpha: 0.9),
           shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(color: AppColors.divider, width: 0.5),
         ),
-        child: Icon(icon, size: 18, color: Colors.black87),
+        child: Icon(icon, size: 16, color: AppColors.textPrimary),
       ),
     );
   }

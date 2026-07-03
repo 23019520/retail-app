@@ -29,4 +29,8 @@ class RouteConstants {
   static const String adminOrders = '/admin/orders';
   static const String adminOrderDetail = '/admin/orders/:orderId';
   static const String adminSettings = '/admin/settings';
+
+  // ── New ──────────────────────────────────────────────────────────────────
+  static const String adminCategories = '/admin/categories';
+  static const String adminCategoryForm = '/admin/categories/form';
 }

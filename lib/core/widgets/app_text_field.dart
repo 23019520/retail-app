@@ -1,88 +1,157 @@
+/// AppTextField — unified input field.
+/// All decoration comes from the theme; this widget just wires in the extras.
+library app_text_field;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Styled text field that wraps TextFormField.
-/// Handles all the decoration boilerplate so screens stay clean.
-class AppTextField extends StatefulWidget {
+import '../../theme/app_tokens.dart';
+
+class AppTextField extends StatelessWidget {
   const AppTextField({
     super.key,
     required this.label,
     this.hint,
     this.controller,
+    this.focusNode,
     this.validator,
     this.onChanged,
     this.onFieldSubmitted,
-    this.obscureText = false,
     this.keyboardType,
     this.textInputAction,
+    this.obscureText = false,
+    this.maxLines = 1,
+    this.minLines,
     this.prefixIcon,
     this.suffixIcon,
-    this.enabled = true,
+    this.readOnly = false,
     this.autofocus = false,
-    this.maxLines = 1,
     this.inputFormatters,
-    this.focusNode,
     this.initialValue,
   });
 
   final String label;
   final String? hint;
   final TextEditingController? controller;
-  final String? Function(String?)? validator;
+  final FocusNode? focusNode;
+  final FormFieldValidator<String>? validator;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onFieldSubmitted;
-  final bool obscureText;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
+  final bool obscureText;
+  final int? maxLines;
+  final int? minLines;
   final IconData? prefixIcon;
   final Widget? suffixIcon;
-  final bool enabled;
+  final bool readOnly;
   final bool autofocus;
-  final int maxLines;
   final List<TextInputFormatter>? inputFormatters;
-  final FocusNode? focusNode;
   final String? initialValue;
-
-  @override
-  State<AppTextField> createState() => _AppTextFieldState();
-}
-
-class _AppTextFieldState extends State<AppTextField> {
-  late bool _obscure;
-
-  @override
-  void initState() {
-    super.initState();
-    _obscure = widget.obscureText;
-  }
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
-      controller: widget.controller,
-      initialValue: widget.initialValue,
-      validator: widget.validator,
-      onChanged: widget.onChanged,
-      onFieldSubmitted: widget.onFieldSubmitted,
-      obscureText: _obscure,
-      keyboardType: widget.keyboardType,
-      textInputAction: widget.textInputAction,
-      enabled: widget.enabled,
-      autofocus: widget.autofocus,
-      maxLines: widget.obscureText ? 1 : widget.maxLines,
-      focusNode: widget.focusNode,
-      inputFormatters: widget.inputFormatters,
+      controller: controller,
+      focusNode: focusNode,
+      validator: validator,
+      onChanged: onChanged,
+      onFieldSubmitted: onFieldSubmitted,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      obscureText: obscureText,
+      maxLines: obscureText ? 1 : maxLines,
+      minLines: minLines,
+      readOnly: readOnly,
+      autofocus: autofocus,
+      inputFormatters: inputFormatters,
+      initialValue: initialValue,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        color: AppColors.textPrimary,
+      ),
       decoration: InputDecoration(
-        labelText: widget.label,
-        hintText: widget.hint,
-        prefixIcon: widget.prefixIcon != null ? Icon(widget.prefixIcon) : null,
-        // Password fields get a show/hide toggle automatically
-        suffixIcon: widget.obscureText
-            ? IconButton(
-                icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                onPressed: () => setState(() => _obscure = !_obscure),
-              )
-            : widget.suffixIcon,
+        labelText: label,
+        hintText: hint,
+        prefixIcon: prefixIcon != null
+            ? Icon(prefixIcon, size: 18, color: AppColors.textMuted)
+            : null,
+        suffixIcon: suffixIcon,
+      ),
+    );
+  }
+}
+
+/// Borderless search-style field for use inside search bars.
+class AppSearchField extends StatelessWidget {
+  const AppSearchField({
+    super.key,
+    this.hint = 'Search laptops, accessories...',
+    this.controller,
+    this.onChanged,
+    this.onSubmitted,
+    this.autofocus = false,
+    this.readOnly = false,
+    this.onTap,
+  });
+
+  final String hint;
+  final TextEditingController? controller;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final bool autofocus;
+  final bool readOnly;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: readOnly ? onTap : null,
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: AppColors.backgroundSheet,
+          borderRadius: BorderRadius.circular(AppRadius.button),
+          border: Border.all(color: AppColors.divider, width: 1),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: AppSpacing.md),
+            const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: readOnly
+                  ? Text(
+                      hint,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textMuted,
+                      ),
+                    )
+                  : TextField(
+                      controller: controller,
+                      onChanged: onChanged,
+                      onSubmitted: onSubmitted,
+                      autofocus: autofocus,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: hint,
+                        hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+          ],
+        ),
       ),
     );
   }

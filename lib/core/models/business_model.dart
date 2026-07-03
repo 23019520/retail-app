@@ -21,7 +21,7 @@ class BusinessModel {
   final String id;
   final String name;
   final String? logoUrl;
-  final String? primaryColorHex;    // e.g. "#1A1A2E"
+  final String? primaryColorHex;
   final String? secondaryColorHex;
   final String? phone;
   final String? email;
@@ -31,7 +31,6 @@ class BusinessModel {
   final String currencySymbol;
   final bool isActive;
 
-  /// Parse hex color string to Color. Falls back to null (theme default).
   Color? get primaryColor => _hexToColor(primaryColorHex);
   Color? get secondaryColor => _hexToColor(secondaryColorHex);
 
@@ -40,6 +39,13 @@ class BusinessModel {
     final cleaned = hex.replaceAll('#', '');
     if (cleaned.length != 6) return null;
     return Color(int.parse('FF$cleaned', radix: 16));
+  }
+
+  static double _toDouble(dynamic value, double fallback) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
   }
 
   factory BusinessModel.fromJson(Map<String, dynamic> json) {
@@ -52,8 +58,8 @@ class BusinessModel {
       phone: json['phone'] as String?,
       email: json['email'] as String?,
       address: json['address'] as String?,
-      deliveryFee: (json['deliveryFee'] as num?)?.toDouble() ?? 50.0,
-      freeDeliveryThreshold: (json['freeDeliveryThreshold'] as num?)?.toDouble() ?? 500.0,
+      deliveryFee: _toDouble(json['deliveryFee'], 50.0),
+      freeDeliveryThreshold: _toDouble(json['freeDeliveryThreshold'], 500.0),
       currencySymbol: json['currencySymbol'] as String? ?? 'R',
       isActive: json['isActive'] as bool? ?? true,
     );
@@ -98,13 +104,13 @@ class BusinessModel {
       email: email ?? this.email,
       address: address ?? this.address,
       deliveryFee: deliveryFee ?? this.deliveryFee,
-      freeDeliveryThreshold: freeDeliveryThreshold ?? this.freeDeliveryThreshold,
+      freeDeliveryThreshold:
+          freeDeliveryThreshold ?? this.freeDeliveryThreshold,
       currencySymbol: currencySymbol ?? this.currencySymbol,
       isActive: isActive ?? this.isActive,
     );
   }
 
-  /// Default/fallback business used before Firestore loads
   static const BusinessModel empty = BusinessModel(
     id: '',
     name: 'My Store',

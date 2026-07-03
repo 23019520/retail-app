@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'core/constants/route_constants.dart';
 import 'features/auth/providers/auth_provider.dart';
 
-// --- Screen imports (Sprint 1: placeholders; replaced sprint-by-sprint) ---
 import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
@@ -25,42 +24,36 @@ import 'features/admin/screens/product_form_screen.dart';
 import 'features/admin/screens/order_management_screen.dart';
 import 'features/admin/screens/order_detail_admin_screen.dart';
 import 'features/admin/screens/settings_screen.dart';
+// ── New ──────────────────────────────────────────────────────────────────────
+import 'features/admin/screens/category_management_screen.dart';
+import 'features/admin/screens/category_form_screen.dart';
 import 'features/admin/widgets/admin_nav_rail.dart';
 
 /// Riverpod provider so the router can watch auth state reactively.
-/// When authStateProvider changes, go_router re-runs the redirect.
 final routerProvider = Provider<GoRouter>((ref) {
-  // listenable that fires when auth state changes
   final authListenable = _AuthStateListenable(ref);
 
   return GoRouter(
     initialLocation: RouteConstants.splash,
     refreshListenable: authListenable,
-    debugLogDiagnostics: true, // turn off in production
+    debugLogDiagnostics: true,
 
-    // --- Route guard ---
     redirect: (BuildContext context, GoRouterState state) {
       final authValue = ref.read(authStateProvider);
       final isLoading = authValue.isLoading;
       final isLoggedIn = authValue.value != null;
       final location = state.matchedLocation;
 
-      // Stay on splash while Firebase auth initialises
       if (isLoading) return RouteConstants.splash;
 
       final isOnAuthPage = location == RouteConstants.login ||
           location == RouteConstants.register ||
           location == RouteConstants.splash;
 
-
-      // Not logged in → force to login (except auth pages)
       if (!isLoggedIn && !isOnAuthPage) return RouteConstants.login;
-
-      // Logged in and on auth page → go home
       if (isLoggedIn && isOnAuthPage) return RouteConstants.home;
 
-      // Admin route guard is handled inside AdminLoginScreen / admin screens
-      return null; // no redirect needed
+      return null;
     },
 
     routes: [
@@ -78,7 +71,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RegisterScreen(),
       ),
 
-      // ── Customer shell with bottom nav ────────────────────────────────
+      // ── Customer shell ────────────────────────────────────────────────
       ShellRoute(
         builder: (context, state, child) => _CustomerShell(child: child),
         routes: [
@@ -164,6 +157,15 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: RouteConstants.adminSettings,
             builder: (context, state) => const SettingsScreen(),
           ),
+          // ── New category routes ────────────────────────────────────
+          GoRoute(
+            path: RouteConstants.adminCategories,
+            builder: (context, state) => const CategoryManagementScreen(),
+          ),
+          GoRoute(
+            path: RouteConstants.adminCategoryForm,
+            builder: (context, state) => const CategoryFormScreen(),
+          ),
         ],
       ),
     ],
@@ -201,18 +203,38 @@ class _CustomerShellState extends State<_CustomerShell> {
           context.go(_tabs[index]);
         },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.grid_view_outlined), selectedIcon: Icon(Icons.grid_view), label: 'Products'),
-          NavigationDestination(icon: Icon(Icons.shopping_cart_outlined), selectedIcon: Icon(Icons.shopping_cart), label: 'Cart'),
-          NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Orders'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view),
+            label: 'Products',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.shopping_cart_outlined),
+            selectedIcon: Icon(Icons.shopping_cart),
+            label: 'Cart',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long),
+            label: 'Orders',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Auth listenable (bridges Riverpod → go_router) ────────────────────────
+// ── Auth listenable ───────────────────────────────────────────────────────
 class _AuthStateListenable extends ChangeNotifier {
   _AuthStateListenable(Ref ref) {
     ref.listen(authStateProvider, (_, __) => notifyListeners());

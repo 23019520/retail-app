@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,7 @@ import '../../../core/extensions/context_extensions.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../../theme/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class AdminLoginScreen extends ConsumerStatefulWidget {
@@ -17,9 +19,9 @@ class AdminLoginScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
+  final _formKey       = GlobalKey<FormState>();
+  final _emailCtrl     = TextEditingController();
+  final _passwordCtrl  = TextEditingController();
   final _passwordFocus = FocusNode();
 
   @override
@@ -39,21 +41,29 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
         );
 
     if (!mounted) return;
+    if (!success) return;
 
-    if (success) {
-      // Check admin claim
-      final isAdmin = await ref.read(isAdminProvider.future);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final token = await user.getIdTokenResult(true);
+      final role  = token.claims?['role'];
       if (!mounted) return;
 
-      if (isAdmin) {
+      if (role == 'admin') {
         context.go(RouteConstants.adminDashboard);
       } else {
-        // Signed in but not admin — sign out and show error
         await ref.read(authNotifierProvider.notifier).signOut();
         if (mounted) {
           context.showErrorSnackBar(
-              'Access denied. This account does not have admin privileges.');
+            'Access denied. This account does not have admin privileges.',
+          );
         }
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showErrorSnackBar('Could not verify admin access. Please try again.');
       }
     }
   }
@@ -61,55 +71,68 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
-    final colors = Theme.of(context).colorScheme;
 
-    ref.listen(authNotifierProvider, (previous, next) {
-      if (next.hasError && next.errorMessage != previous?.errorMessage) {
+    ref.listen(authNotifierProvider, (prev, next) {
+      if (next.hasError && next.errorMessage != prev?.errorMessage) {
         context.showErrorSnackBar(next.errorMessage!);
       }
     });
 
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: AppColors.backgroundBase,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(AppSpacing.xl),
             child: ConstrainedBox(
-              // Centre the form on wide screens
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Icon
+                  // ── Icon ───────────────────────────────────────────────
                   Container(
-                    width: 56,
-                    height: 56,
+                    width: 52,
+                    height: 52,
                     decoration: BoxDecoration(
-                      color: colors.primary,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(Icons.admin_panel_settings_outlined,
-                        color: colors.onPrimary, size: 28),
-                  ),
-                  const SizedBox(height: 24),
-
-                  Text(
-                    'Admin Login',
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Sign in to manage your store',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: colors.onSurface.withValues(alpha: 0.6),
+                      color: AppColors.backgroundCard,
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      border: Border.all(color: AppColors.divider, width: 0.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.12),
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
                         ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.admin_panel_settings_outlined,
+                      color: AppColors.primary,
+                      size: 26,
+                    ),
                   ),
 
-                  const SizedBox(height: 36),
+                  const SizedBox(height: AppSpacing.lg),
+
+                  const Text(
+                    'Admin Login',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  const Text(
+                    'Sign in to manage your store',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+
+                  const SizedBox(height: AppSpacing.xl),
 
                   Form(
                     key: _formKey,
@@ -125,7 +148,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
                           onFieldSubmitted: (_) =>
                               _passwordFocus.requestFocus(),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.md),
                         AppTextField(
                           label: 'Password',
                           controller: _passwordCtrl,
@@ -140,7 +163,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: AppSpacing.lg),
 
                   AppButton(
                     label: 'Sign In',
@@ -148,7 +171,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
                     onPressed: _submit,
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.base),
 
                   Center(
                     child: TextButton(

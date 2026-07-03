@@ -40,6 +40,13 @@ class ProductFormState {
     this.isActive = true,
     this.isLoading = false,
     this.errorMessage,
+    // ── Resale trust fields ──────────────────────────────────────────────
+    this.condition,
+    this.batteryHealth,
+    this.isInspected = false,
+    this.returnPolicyDays = 7,
+    this.warrantyMonths = 0,
+    this.deliveredFrom = '',
   });
 
   final String name;
@@ -52,6 +59,14 @@ class ProductFormState {
   final bool isActive;
   final bool isLoading;
   final String? errorMessage;
+
+  // ── Resale trust fields ────────────────────────────────────────────────────
+  final ProductCondition? condition;
+  final double? batteryHealth;
+  final bool isInspected;
+  final int returnPolicyDays;
+  final int warrantyMonths;
+  final String deliveredFrom;
 
   bool get hasError => errorMessage != null;
 
@@ -66,6 +81,14 @@ class ProductFormState {
     bool? isActive,
     bool? isLoading,
     String? errorMessage,
+    ProductCondition? condition,
+    bool clearCondition = false,
+    double? batteryHealth,
+    bool clearBatteryHealth = false,
+    bool? isInspected,
+    int? returnPolicyDays,
+    int? warrantyMonths,
+    String? deliveredFrom,
   }) {
     return ProductFormState(
       name: name ?? this.name,
@@ -78,6 +101,13 @@ class ProductFormState {
       isActive: isActive ?? this.isActive,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
+      condition: clearCondition ? null : (condition ?? this.condition),
+      batteryHealth:
+          clearBatteryHealth ? null : (batteryHealth ?? this.batteryHealth),
+      isInspected: isInspected ?? this.isInspected,
+      returnPolicyDays: returnPolicyDays ?? this.returnPolicyDays,
+      warrantyMonths: warrantyMonths ?? this.warrantyMonths,
+      deliveredFrom: deliveredFrom ?? this.deliveredFrom,
     );
   }
 
@@ -90,6 +120,12 @@ class ProductFormState {
       categoryId: p.categoryId,
       existingImageUrls: p.imageUrls,
       isActive: p.isActive,
+      condition: p.condition,
+      batteryHealth: p.batteryHealth,
+      isInspected: p.isInspected,
+      returnPolicyDays: p.returnPolicyDays,
+      warrantyMonths: p.warrantyMonths,
+      deliveredFrom: p.deliveredFrom,
     );
   }
 }
@@ -117,9 +153,20 @@ class ProductFormNotifier extends StateNotifier<ProductFormState> {
   void setCategoryId(String v) => state = state.copyWith(categoryId: v);
   void setIsActive(bool v) => state = state.copyWith(isActive: v);
 
+  // ── Resale trust field setters ────────────────────────────────────────────
+  void setCondition(ProductCondition v) => state = state.copyWith(condition: v);
+  void clearCondition() => state = state.copyWith(clearCondition: true);
+
+  void setBatteryHealth(double v) => state = state.copyWith(batteryHealth: v);
+  void clearBatteryHealth() => state = state.copyWith(clearBatteryHealth: true);
+
+  void setIsInspected(bool v) => state = state.copyWith(isInspected: v);
+  void setReturnPolicyDays(int v) => state = state.copyWith(returnPolicyDays: v);
+  void setWarrantyMonths(int v) => state = state.copyWith(warrantyMonths: v);
+  void setDeliveredFrom(String v) => state = state.copyWith(deliveredFrom: v);
+
   void addImageFile(File file) {
-    state = state.copyWith(
-        newImageFiles: [...state.newImageFiles, file]);
+    state = state.copyWith(newImageFiles: [...state.newImageFiles, file]);
   }
 
   void removeExistingImage(String url) {
@@ -142,10 +189,13 @@ class ProductFormNotifier extends StateNotifier<ProductFormState> {
     try {
       final storageService = _ref.read(adminStorageServiceProvider);
 
+      // Lock in ONE product ID upfront so Storage path and Firestore doc match
+      final productId = existingProductId ??
+          _firestore.collection(FirestoreConstants.products).doc().id;
+
       // Upload any new images
       final newUrls = <String>[];
       for (final file in state.newImageFiles) {
-        final productId = existingProductId ?? _firestore.collection('products').doc().id;
         final url = await storageService.uploadFile(
           file: file,
           path: 'products/$productId',
@@ -155,7 +205,7 @@ class ProductFormNotifier extends StateNotifier<ProductFormState> {
 
       final allImageUrls = [...state.existingImageUrls, ...newUrls];
 
-      final data = {
+      final data = <String, dynamic>{
         'name': state.name.trim(),
         'description': state.description.trim(),
         'price': state.price,
@@ -164,18 +214,41 @@ class ProductFormNotifier extends StateNotifier<ProductFormState> {
         'imageUrls': allImageUrls,
         'isActive': state.isActive,
         'businessId': _businessId,
+        // ── Resale trust fields ──────────────────────────────────────────
+        'condition': state.condition?.name,
+        'batteryHealth': state.batteryHealth,
+        'isInspected': state.isInspected,
+        'returnPolicyDays': state.returnPolicyDays,
+        'warrantyMonths': state.warrantyMonths,
+        'deliveredFrom': state.deliveredFrom.trim(),
       };
 
       if (existingProductId != null) {
-        // Update
+        // Use FieldValue.delete() so switching a product to a type without
+        // condition/battery actually clears the old values in Firestore,
+        // rather than leaving stale data behind.
+        if (state.condition == null) {
+          data['condition'] = FieldValue.delete();
+        }
+        if (state.batteryHealth == null) {
+          data['batteryHealth'] = FieldValue.delete();
+        }
         await _firestore
             .collection(FirestoreConstants.products)
-            .doc(existingProductId)
+            .doc(productId)
             .update(data);
       } else {
-        // Create
-        final ref = _firestore.collection(FirestoreConstants.products).doc();
-        await ref.set({...data, 'id': ref.id, 'createdAt': FieldValue.serverTimestamp()});
+        // Create new — strip nulls instead of writing FieldValue.delete()
+        // (delete() is only valid on update(), not set()).
+        data.removeWhere((key, value) => value == null);
+        await _firestore
+            .collection(FirestoreConstants.products)
+            .doc(productId)
+            .set({
+          ...data,
+          'id': productId,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
       }
 
       state = const ProductFormState();
@@ -187,7 +260,7 @@ class ProductFormNotifier extends StateNotifier<ProductFormState> {
     }
   }
 
-  /// Delete a product and its images.
+  /// Delete a product and all its Storage images.
   Future<bool> delete(ProductModel product) async {
     state = state.copyWith(isLoading: true);
     try {
@@ -213,9 +286,7 @@ final productFormProvider =
     StateNotifierProvider<ProductFormNotifier, ProductFormState>(
         (ref) => ProductFormNotifier(ref));
 
-// ── Product to edit — shared between management and form screens ──────────────
+// ── Product to edit ───────────────────────────────────────────────────────────
 
 /// Holds the product being edited. Null = creating a new product.
-/// Defined here so both ProductManagementScreen and ProductFormScreen
-/// can import it without a private-member export issue.
 final productToEditProvider = StateProvider<ProductModel?>((ref) => null);
