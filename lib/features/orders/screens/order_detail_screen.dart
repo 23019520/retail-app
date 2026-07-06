@@ -236,7 +236,7 @@ class _TrackingTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final steps = OrderStatus.pipeline;
+    const steps = OrderStatus.pipeline;
     final currentIndex = steps.indexOf(order.status);
 
     return _SectionCard(

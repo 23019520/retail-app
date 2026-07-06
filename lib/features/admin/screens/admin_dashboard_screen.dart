@@ -10,7 +10,6 @@ import '../../../core/widgets/app_stagger.dart';
 import '../../../core/widgets/metric_card.dart';
 import '../../../theme/app_theme.dart';
 import '../providers/admin_orders_provider.dart';
-import '../providers/admin_categories_provider.dart';
 import '../providers/admin_products_provider.dart';
 import '../providers/admin_settings_provider.dart';
 import '../widgets/admin_order_tile.dart';
