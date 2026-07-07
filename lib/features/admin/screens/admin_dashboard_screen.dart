@@ -26,7 +26,6 @@ class AdminDashboardScreen extends ConsumerWidget {
     final businessName = settingsAsync.value?.name ?? 'My Store';
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
       body: SafeArea(
         child: AppStagger(
           child: CustomScrollView(
@@ -37,7 +36,6 @@ class AdminDashboardScreen extends ConsumerWidget {
                 snap: true,
                 elevation: 0,
                 scrolledUnderElevation: 0,
-                backgroundColor: AppColors.backgroundBase,
                 title: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

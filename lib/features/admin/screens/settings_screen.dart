@@ -89,11 +89,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return settingsAsync.when(
       loading: () => const Scaffold(
-        backgroundColor: AppColors.backgroundBase,
         body: AppLoading(),
       ),
       error: (_, __) => const Scaffold(
-        backgroundColor: AppColors.backgroundBase,
         body: Center(
           child: Text(
             'Could not load settings.',
@@ -105,7 +103,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _initFromBusiness(business);
 
         return Scaffold(
-          backgroundColor: AppColors.backgroundBase,
           body: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(AppSpacing.base),

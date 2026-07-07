@@ -38,7 +38,7 @@ class _ProductManagementScreenState
     final productsAsync = ref.watch(adminProductsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
+      
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

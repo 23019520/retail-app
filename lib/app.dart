@@ -17,8 +17,8 @@ class RetailApp extends ConsumerWidget {
       title: 'Retail App',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
+      darkTheme: AppTheme.light(),
+      themeMode: ThemeMode.light,
       routerConfig: router,
     );
   }

@@ -18,7 +18,7 @@ class AppTheme {
   // ── ColorScheme ────────────────────────────────────────────────────────────
 
   static ColorScheme get _colorScheme => const ColorScheme(
-    brightness: Brightness.dark,
+    brightness: Brightness.light,
 
     // Backgrounds / surfaces
     surface:              AppColors.backgroundCard,

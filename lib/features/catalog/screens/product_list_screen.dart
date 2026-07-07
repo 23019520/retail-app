@@ -20,7 +20,7 @@ class ProductListScreen extends ConsumerWidget {
     final searchQuery    = ref.watch(searchQueryProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
+      
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -21,7 +21,7 @@ class CartScreen extends ConsumerWidget {
     final checkoutState = ref.watch(checkoutProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
+      
       body: SafeArea(
         child: cartAsync.when(
           loading: () => const Center(

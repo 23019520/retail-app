@@ -32,11 +32,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
     return productAsync.when(
       loading: () => const Scaffold(
-        backgroundColor: AppColors.backgroundBase,
         body: AppLoading(),
       ),
       error: (_, __) => Scaffold(
-        backgroundColor: AppColors.backgroundBase,
         appBar: AppBar(),
         body: const Center(
           child: Text(
@@ -48,7 +46,6 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       data: (product) {
         if (product == null) {
           return Scaffold(
-            backgroundColor: AppColors.backgroundBase,
             appBar: AppBar(),
             body: const Center(
               child: Text(
@@ -91,7 +88,6 @@ class _ProductDetailContent extends ConsumerWidget {
     final batteryHealth = product.batteryHealth;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
       body: Stack(
         children: [
           CustomScrollView(
@@ -100,7 +96,6 @@ class _ProductDetailContent extends ConsumerWidget {
               SliverAppBar(
                 expandedHeight: screenHeight * 0.40,
                 pinned: true,
-                backgroundColor: AppColors.backgroundBase,
                 elevation: 0,
                 scrolledUnderElevation: 0,
                 leading: Padding(
@@ -131,7 +126,6 @@ class _ProductDetailContent extends ConsumerWidget {
               SliverToBoxAdapter(
                 child: Container(
                   decoration: const BoxDecoration(
-                    color: AppColors.backgroundBase,
                     borderRadius: BorderRadius.vertical(
                       top: Radius.circular(AppRadius.sheet),
                     ),

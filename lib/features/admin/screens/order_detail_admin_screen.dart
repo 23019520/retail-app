@@ -23,11 +23,9 @@ class OrderDetailAdminScreen extends ConsumerWidget {
 
     return orderAsync.when(
       loading: () => const Scaffold(
-        backgroundColor: AppColors.backgroundBase,
         body: AppLoading(),
       ),
       error: (_, __) => Scaffold(
-        backgroundColor: AppColors.backgroundBase,
         appBar: AppBar(),
         body: AppErrorWidget(
           message: 'Could not load order.',
@@ -37,7 +35,6 @@ class OrderDetailAdminScreen extends ConsumerWidget {
       data: (order) {
         if (order == null) {
           return Scaffold(
-            backgroundColor: AppColors.backgroundBase,
             appBar: AppBar(),
             body: const AppErrorWidget(message: 'Order not found.'),
           );
@@ -56,7 +53,6 @@ class _AdminOrderDetailContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
       appBar: AppBar(
         title: Text(
           Formatters.orderId(order.id),

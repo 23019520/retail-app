@@ -89,7 +89,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     final isLoading = ref.watch(authStateProvider).isLoading;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
+      
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

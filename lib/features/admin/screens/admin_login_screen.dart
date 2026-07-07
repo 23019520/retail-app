@@ -79,7 +79,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
     });
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
+      
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

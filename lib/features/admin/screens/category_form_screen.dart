@@ -60,13 +60,11 @@ class _CategoryFormScreenState extends ConsumerState<CategoryFormScreen> {
 
     if (formState.isLoading) {
       return const Scaffold(
-        backgroundColor: AppColors.backgroundBase,
         body: AppLoading(message: 'Saving category...'),
       );
     }
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Category' : 'New Category'),
         leading: IconButton(

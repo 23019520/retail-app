@@ -19,7 +19,7 @@ class CategoryManagementScreen extends ConsumerWidget {
     final categoriesAsync = ref.watch(adminCategoriesProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
+      
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

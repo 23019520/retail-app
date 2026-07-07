@@ -51,7 +51,7 @@ class _OrderHistoryScreenState extends ConsumerState<OrderHistoryScreen>
     final ordersAsync = ref.watch(userOrdersProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
+      
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

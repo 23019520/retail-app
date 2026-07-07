@@ -55,7 +55,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -297,7 +296,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     });
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

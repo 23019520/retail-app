@@ -49,13 +49,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
     if (_processingPayment) {
       return const Scaffold(
-        backgroundColor: AppColors.backgroundBase,
         body: AppLoading(message: 'Processing payment...'),
       );
     }
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
       appBar: AppBar(
         title: const Text('Checkout'),
         leading: IconButton(

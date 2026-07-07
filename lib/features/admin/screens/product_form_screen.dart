@@ -117,13 +117,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
     if (formState.isLoading) {
       return const Scaffold(
-        backgroundColor: AppColors.backgroundBase,
         body: AppLoading(message: 'Saving product...'),
       );
     }
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundBase,
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Product' : 'New Product'),
         leading: IconButton(
